@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.01b1
+// @description    display the vicinity of a particular tweet on Twitter ver.0.01b2
 // ==/UserScript==
 /*
   Download URL: 'http://furyu-tei.sakura.ne.jp/script/twDisplayVicinity.user.js'
@@ -83,9 +83,10 @@ var main = function(w, d){
 		jq_link.attr('href', 'javascript:void(0)');
 		jq_link.css({'color':LINK_COLOR, 'padding':'4px'});
 		
-		jq_link.click(function(){
+		var	tweet_search_by_id = function(url_search, tweet_id, cwin, target_color){
+			if (cwin) {cwin.location.href = url_search} else {cwin = w.open(url_search)}
+			if (!target_color) target_color = TARGET_TWEET_COLOR;
 			var	wait_cnt = MAX_RETRY;
-			var	cwin = window.open(url_search);
 			var	check = function(){
 				var	$ = (function(){try{return cwin.$}catch(e){return null}})();
 				if (!$) {
@@ -102,10 +103,14 @@ var main = function(w, d){
 					setTimeout(check, INTV_CHECK);
 					return;
 				} 
-				jq_tweet_li.css('background', 'gold');
+				jq_tweet_li.css('background', target_color);
 				$('body,html').animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, '0');
 			};	//	end of check()
 			check();
+		};	//	end of tweet_search_by_id()
+		
+		jq_link.click(function(){
+			tweet_search_by_id(url_search, tweet_id);
 			return false;
 		});
 		
@@ -121,26 +126,61 @@ var main = function(w, d){
 			jq_rt_link.css({'color':RT_LINK_COLOR, 'padding':'4px'});
 			
 			jq_rt_link.click(function(){
-				var	wait_cnt = MAX_RETRY;
-				var	cwin = window.open(url_rt_search);
-				var	check = function(){
-					var	$ = (function(){try{return cwin.$}catch(e){return null}})();
-					if (!$) {
-						setTimeout(check, INTV_CHECK);
-						return;
-					}
-					var	jq_tweet_li = $("li[data-item-id]:first");
-					if (jq_tweet_li.size() < 1) {
-						if ($('div.stream-end').is(':visible')) {
-							wait_cnt--;
-							if (wait_cnt <= 0) return;
+				var	cwin = w.open('about:blank');
+				var	callback = function(html){
+					log_debug('*** callback');
+					for (;;) {
+						if (html.match(/<li\s*class="[\s\S]*?stream-item[\s\S]*?data-item-id="(\d+)"/i)) {
+							var	tweet_id = RegExp.$1;
+							log_debug('tweet_id='+tweet_id);
+							if (html.match(/<span\s*class="[\s\S]*?_timestamp[\s\S]*?\s*data-time="(\d+)"/i)) {
+								var	time_sec = parseInt(RegExp.$1);
+								log_debug('time_sec='+time_sec);
+								var	since = get_date_str(time_sec-3600*24*DAY_BEFORE), until = get_date_str(time_sec+3600*24*(1+DAY_AFTER));
+								var	url_search = 'https://twitter.com/search?q='+encodeURIComponent('from:'+retweeter+' since:'+since+' until:'+until)+'&f=realtime';
+								var	click = function(cwin){
+									tweet_search_by_id(url_search, tweet_id, cwin, VICINITY_TWEET_COLOR);
+									return false;
+								};	//	end of click()
+								break;
+							}
 						}
-						setTimeout(check, INTV_CHECK);
-						return;
-					} 
-					jq_tweet_li.css('background', VICINITY_TWEET_COLOR);
-				};	//	end of check()
-				check();
+						var	click = function(cwin){
+							var	wait_cnt = MAX_RETRY;
+							if (cwin) {cwin.location.href = url_rt_search} else {cwin = w.open(url_rt_search)}
+							var	check = function(){
+								var	$ = (function(){try{return cwin.$}catch(e){return null}})();
+								if (!$) {
+									setTimeout(check, INTV_CHECK);
+									return;
+								}
+								var	jq_tweet_li = $("li[data-item-id]:first");
+								if (jq_tweet_li.size() < 1) {
+									if ($('div.stream-end').is(':visible')) {
+										wait_cnt--;
+										if (wait_cnt <= 0) return;
+									}
+									setTimeout(check, INTV_CHECK);
+									return;
+								} 
+								jq_tweet_li.css('background', VICINITY_TWEET_COLOR);
+							};	//	end of check()
+							check();
+							return false;
+						};	//	end of click()
+						break;
+					}
+					var	jq_rt_link2 = jq_rt_link.clone();
+					jq_rt_link2.click(function(){click(cwin)});
+					jq_rt_link.after(jq_rt_link2);
+					jq_rt_link.remove();
+					jq_rt_link2.click();
+					cwin = null;
+				};	//	end of callback()
+				
+				//$.ajax({url:url_rt_search, success:callback, dataType:'html'});
+				$.get(url_rt_search, callback, 'html');
+				
 				return false;
 			});
 			jq_tweet.find('div.context:first').find('div.with-icn:first').append(jq_rt_link);
@@ -181,7 +221,7 @@ var main = function(w, d){
 			
 			jq_link.click(function(){
 				var	wait_cnt = MAX_RETRY;
-				var	cwin = window.open(url_search);
+				var	cwin = w.open(url_search);
 				var	check = function(){
 					var	$ = (function(){try{return cwin.$}catch(e){return null}})();
 					if (!$) {
