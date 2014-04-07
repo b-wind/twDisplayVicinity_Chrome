@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.01b
+// @description    display the vicinity of a particular tweet on Twitter ver.0.01b1
 // ==/UserScript==
 /*
   Download URL: 'http://furyu-tei.sakura.ne.jp/script/twDisplayVicinity.user.js'
@@ -83,9 +83,8 @@ var main = function(w, d){
 		jq_link.attr('href', 'javascript:void(0)');
 		jq_link.css({'color':LINK_COLOR, 'padding':'4px'});
 		
-		var	wait_cnt = MAX_RETRY;
-		
 		jq_link.click(function(){
+			var	wait_cnt = MAX_RETRY;
 			var	cwin = window.open(url_search);
 			var	check = function(){
 				var	$ = (function(){try{return cwin.$}catch(e){return null}})();
@@ -121,9 +120,8 @@ var main = function(w, d){
 			jq_rt_link.attr('href', 'javascript:void(0)');
 			jq_rt_link.css({'color':RT_LINK_COLOR, 'padding':'4px'});
 			
-			var	wait_cnt = MAX_RETRY;
-			
 			jq_rt_link.click(function(){
+				var	wait_cnt = MAX_RETRY;
 				var	cwin = window.open(url_rt_search);
 				var	check = function(){
 					var	$ = (function(){try{return cwin.$}catch(e){return null}})();
@@ -181,9 +179,8 @@ var main = function(w, d){
 			jq_link.attr('href', 'javascript:void(0)');
 			jq_link.css({'color':LINK_COLOR});
 			
-			var	wait_cnt = MAX_RETRY;
-			
 			jq_link.click(function(){
+				var	wait_cnt = MAX_RETRY;
 				var	cwin = window.open(url_search);
 				var	check = function(){
 					var	$ = (function(){try{return cwin.$}catch(e){return null}})();
