@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.01
+// @description    display the vicinity of a particular tweet on Twitter ver.0.01a
 // ==/UserScript==
 /*
   Download URL: 'http://furyu-tei.sakura.ne.jp/script/twDisplayVicinity.user.js'
@@ -74,7 +74,7 @@ var main = function(w, d){
 		var	url_search = 'https://twitter.com/search?q='+encodeURIComponent('from:'+screen_name+' since:'+since+' until:'+until)+'&f=realtime';
 		
 		var	jq_link_container = $('<small class="'+NAME_SCRIPT+'_link_container"><a title="'+LINK_TITLE+'">'+LINK_TEXT+'</a></small>'), jq_link = jq_link_container.find('a:first');
-		jq_link.attr('href', url_search);
+		jq_link.attr('href', 'javascript:void(0)');
 		jq_link.css({'color':LINK_COLOR, 'padding':'4px'});
 		
 		var	wait_cnt = MAX_RETRY;
@@ -110,7 +110,7 @@ var main = function(w, d){
 		if (!FLG_TWITSPRITZ || !jq_tweet.parents('div.permalink-tweet-container')[0]) return;
 		
 		var	jq_ts_container = $('<small class="'+NAME_SCRIPT+'_ts_container"><a title="'+TS_LINK_TITLE+'">'+TS_LINK_TEXT+'</a></small>'), jq_ts_link = jq_ts_container.find('a:first');
-		jq_ts_link.attr('href', w.location.href);
+		jq_ts_link.attr('href', 'javascript:void(0)');
 		jq_ts_link.css({'color':TS_LINK_COLOR, 'padding':'4px'});
 		
 		jq_ts_link.click(function(){
