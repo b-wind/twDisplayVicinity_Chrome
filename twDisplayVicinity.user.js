@@ -3,12 +3,38 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.01c
+// @description    display the vicinity of a particular tweet on Twitter ver.0.01c1
 // ==/UserScript==
 /*
-  Download URL: 'http://furyu-tei.sakura.ne.jp/script/twDisplayVicinity.user.js'
-  see also http://let.hatelabo.jp/furyu-tei/let/hLHVnMG9q-NH
+  Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
+  GitHub: https://github.com/furyutei/twDisplayVicinity
+  Related article: http://d.hatena.ne.jp/furyu-tei/20140327/1395914958
+  Original(bookmarklet): http://let.hatelabo.jp/furyu-tei/let/hLHVnMG9q-NH
 */
+/*
+The MIT License (MIT)
+
+Copyright (c) 2014 furyu <furyutei@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
 (function(w, d){
 var main = function(w, d){
 	//{ user parameters
