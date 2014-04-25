@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02a
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -72,7 +72,7 @@ var main = function(w, d){
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02';
+	var VER_SCRIPT = '0.02a';
 	var $=w.$;
 	
 	//{ check environment
@@ -342,7 +342,7 @@ var main = function(w, d){
 		var	debug_hash = tweet_id ? '#source_id='+tweet_id : '';
 		if (id_range) {
 			var	since_id=id_range.since_id, max_id=id_range.max_id;
-			search_url_list.push(API_TIMELINE_BASE + screen_name + '?max_id='+max_id+debug_hash);
+			search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+debug_hash);
 			query = 'from:'+screen_name+' since_id:'+since_id+' max_id:'+max_id;
 		}
 		if (!query) {
@@ -351,7 +351,7 @@ var main = function(w, d){
 				query = 'from:'+screen_name+' since:'+since+' until:'+until;
 			}
 			else {
-				search_url_list.push(API_TIMELINE_BASE + screen_name + '?max_id='+max_id+debug_hash);
+				search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+debug_hash);
 				query = 'from:'+screen_name+' max_id:'+max_id;
 			}
 		}
@@ -524,7 +524,9 @@ var main = function(w, d){
 			else {
 				jq_tweet_li.css('background-color', target_color);
 			}
-			$('body,html').animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, '0');
+			setTimeout(function(){
+				$('body,html').animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, '0');
+			}, INTV_CHECK_MS);
 		};	//	end of check()
 		check();
 	};	//	end of tweet_search()
