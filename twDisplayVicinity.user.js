@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02a
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02b
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -43,6 +43,8 @@ var main = function(w, d){
 	//var	DEBUG_USE_CONSOLE_LOG = true;
 	var	DEBUG_USE_CONSOLE_LOG = false;
 	
+	var	HIDE_NEWER_TWEETS = true;
+	
 	var	DAY_BEFORE = 1;
 	var	DAY_AFTER = 1;
 	
@@ -57,30 +59,59 @@ var main = function(w, d){
 	var	LINK_COLOR = 'darkblue';
 	var	LINK_TEXT = '\u8fd1\u508d';	//	"近傍"
 	var	LINK_TITLE = '\u8fd1\u508d\u30c4\u30a4\u30fc\u30c8\u8868\u793a';	//	"近傍ツイート表示"
+	var	EN_LINK_TEXT = 'vicinity';
+	var	EN_LINK_TITLE = 'search vicinity tweets';
 	
 	var	ACT_LINK_COLOR = 'indigo';
 	var	ACT_LINK_TEXT = '\u8fd1\u508d';	//	"近傍"
 	var	ACT_LINK_TITLE = '\u30a2\u30af\u30b7\u30e7\u30f3\u306e\u8fd1\u508d\u30c4\u30a4\u30fc\u30c8\u8868\u793a';	//	"アクションの近傍ツイート表示"
+	var	EN_ACT_LINK_TEXT = 'vicinity';
+	var	EN_ACT_LINK_TITLE = 'search vicinity tweets around action';
 	
 	var	FLG_TWITSPRITZ = true;
 	var	TS_LINK_COLOR = 'darkgreen';
 	var	TS_LINK_TEXT = 'TwitSpritz';
 	var	TS_LINK_TITLE = 'TwitSpritz\x3a\x20Spritz\u3082\u3069\u304d\u8868\u793a';	//	"TwitSpritz: Spritzもどき表示"
+	var	EN_TS_LINK_TEXT = 'TwitSpritz';
+	var	EN_TS_LINK_TITLE = 'TwitSpritz: show tweet like "TwitSpritz"';
 	
 	//} end of user parameters
 	
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02a';
+	var VER_SCRIPT = '0.02b';
 	var $=w.$;
 	
 	//{ check environment
 	if (w[NAME_SCRIPT+'_touched']) return;
-	if (!$) {var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;}
+	if (!$) {
+		if (!d.getElementById(NAME_SCRIPT+'_jq')) {
+			var	forms = d.getElementsByTagName('form');
+			for (var ci=0,len=forms.length; ci<len; ci++) {
+				if ((' '+forms[ci].className+' ').match(/ search-404 /)) {
+					var	script = d.createElement('script');
+					script.id = NAME_SCRIPT+'_jq';
+					script.src='//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js';
+					d.body.appendChild(script);
+					break;
+				}
+			}
+		}
+		var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;
+	}
 	w[NAME_SCRIPT+'_touched'] = true;
 	//} end of check environment
 	
+	var	LANG = (function(){try{return (w.navigator.browserLanguage || w.navigator.language || w.navigator.userLanguage).substr(0,2)}catch(e){return 'en'}})();
+	if (LANG != 'ja') {
+		LINK_TEXT = EN_LINK_TEXT;
+		LINK_TITLE = EN_LINK_TITLE;
+		ACT_LINK_TEXT = EN_ACT_LINK_TEXT;
+		ACT_LINK_TITLE = EN_ACT_LINK_TITLE;
+		TS_LINK_TEXT = EN_TS_LINK_TEXT;
+		TS_LINK_TITLE = EN_TS_LINK_TITLE;
+	}
 	var	API_SEARCH = 'https://twitter.com/search';
 	var	API_TIMELINE_BASE = 'https://twitter.com/';
 	
@@ -103,8 +134,8 @@ var main = function(w, d){
 	var	ID_INC_PER_SEC = 1000*(0x01 << 22);
 	var	SEC_BEFORE = HOUR_BEFORE * 3600;
 	var	SEC_AFTER = HOUR_AFTER * 3600;
-	var	TWEPOCH = 1288834974657;
-	var	ID_THRESHOLD = '300000000000000';
+	var	TWEPOCH = ~~(1288834974657/1000);	//	1288834974.657 sec (2011.11.04 01:42:54(UTC)) (via http://www.slideshare.net/pfi/id-15755280)
+	var	ID_THRESHOLD = '300000000000000';	//	2010.11.04 22時(UTC)頃に、IDが 30000000000以下から300000000000000以上に切り替え
 	var	ID_BEFORE = null;
 	var	ID_AFTER = null;
 	
@@ -310,7 +341,7 @@ var main = function(w, d){
 	};	//	end of get_date_str()
 	
 	var	get_id_from_utc_sec = function(utc_sec) {
-		var	twepoc = ~~(utc_sec) - 1288834974;	//	1288834974.657 sec (via http://www.slideshare.net/pfi/id-15755280)
+		var	twepoc = ~~(utc_sec) - TWEPOCH;
 		return BigNum.mul(ID_INC_PER_SEC, twepoc);
 	};	//	end of get_id_from_utc_sec()
 	
@@ -339,10 +370,10 @@ var main = function(w, d){
 		else {
 			var	id_range = get_id_range(tweet_id, time_sec);
 		}
-		var	debug_hash = tweet_id ? '#source_id='+tweet_id : '';
+		var	source_hash = tweet_id ? '#source_id='+tweet_id : '';
 		if (id_range) {
 			var	since_id=id_range.since_id, max_id=id_range.max_id;
-			search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+debug_hash);
+			search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+source_hash);
 			query = 'from:'+screen_name+' since_id:'+since_id+' max_id:'+max_id;
 		}
 		if (!query) {
@@ -351,11 +382,11 @@ var main = function(w, d){
 				query = 'from:'+screen_name+' since:'+since+' until:'+until;
 			}
 			else {
-				search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+debug_hash);
+				search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+source_hash);
 				query = 'from:'+screen_name+' max_id:'+max_id;
 			}
 		}
-		search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+debug_hash);
+		search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+source_hash);
 		return search_url_list;
 	};	//	end of get_search_url_list()
 	
@@ -393,6 +424,7 @@ var main = function(w, d){
 	var	get_jq_link_container = function(url_search_list, class_name, title, text, css){
 		var	jq_link_container = $('<small class="'+class_name+'"><a title="'+title+'">'+text+'</a></small>'), jq_link = jq_link_container.find('a:first');
 		set_url_list_to_jq_link(jq_link , url_search_list);
+		jq_link.css({'font-size':'12px'});
 		jq_link.css(css);
 		return {container: jq_link_container, link: jq_link};
 	};	//	end of get_jq_link_container()
@@ -502,6 +534,7 @@ var main = function(w, d){
 				log_debug('Pattern-B:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
 			}
 			else {
+				if (jq_tweet.attr('data-retweet-id')==tweet_id) target_color = VICINITY_TWEET_COLOR;
 				log_debug('Pattern-A:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
 			}
 			var	jq_tweet_li = (jq_tweet.hasClass('js-stream-item')) ? jq_tweet : jq_tweet.parents('.js-stream-item');
@@ -524,16 +557,21 @@ var main = function(w, d){
 			else {
 				jq_tweet_li.css('background-color', target_color);
 			}
+			$('body,html').animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, '0');
 			setTimeout(function(){
 				$('body,html').animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, '0');
 			}, INTV_CHECK_MS);
+			return;
 		};	//	end of check()
 		check();
 	};	//	end of tweet_search()
 	
 	var	add_link_to_tweet = function(jq_tweet){
-		if (0<jq_tweet.find('.'+LINK_CONTAINER_CLASS).size()) return;
-		
+		//jq_tweet.find('div.proxy-tweet-container small.'+LINK_CONTAINER_CLASS).each(function(){$(this).remove()});
+		//if (0 < jq_tweet.parents('div.proxy-tweet-container').size()) return;
+		if (!jq_tweet.is(':visible')) return;
+		var	jq_container = jq_tweet.find('small.'+LINK_CONTAINER_CLASS);
+		if (0<jq_container.size()) return;
 		var	tweet_id = jq_tweet.attr('data-item-id'), screen_name = jq_tweet.attr('data-screen-name');
 		if (!tweet_id || !screen_name) return;
 		var	time_sec = parseInt(jq_tweet.find('span[data-time]:first').attr('data-time'));
@@ -666,6 +704,9 @@ var main = function(w, d){
 		
 		log_debug('Initializing...');
 		
+		var	src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
+		var	max_tweet_id = BigNum(src_tweet_id);
+		
 		if (HIGH_TIME_RESOLUTION) {
 			ID_BEFORE = BigNum.mul(ID_INC_PER_SEC, SEC_BEFORE);
 			ID_AFTER = BigNum.mul(ID_INC_PER_SEC, SEC_AFTER);
@@ -691,25 +732,93 @@ var main = function(w, d){
 		$(tweet_selector).each(function(){
 			var	jq_tweet = $(this);
 			add_link_to_tweet(jq_tweet);
+			var	tweet_id = jq_tweet.attr('data-retweet-id') || jq_tweet.attr('data-item-id');
+			if (max_tweet_id.cmp(tweet_id) < 0) max_tweet_id = BigNum(tweet_id);
 		});
 		var	activity_selector = 'div.stream-item-activity-me[data-activity-type]';
 		$(activity_selector).each(function(){
 			var	jq_activity = $(this);
 			add_link_to_activity(jq_activity);
 		});
+		log_debug('max_tweet_id:'+max_tweet_id);
 		
+		var	container_selector = container_selector_list.join(',');
 		$(d).bind('DOMNodeInserted', function(e){
 			var	jq_target = $(e.target);
-			(jq_target.hasClass('js-stream-tweet')?jq_target:jq_target.find('div.js-stream-tweet')).each(function(){
+			((jq_target.hasClass('js-stream-tweet')||jq_target.hasClass('tweet'))?jq_target:jq_target.find('div.js-stream-tweet,div.tweet')).each(function(){
 				var	jq_tweet = $(this);
+				if (jq_tweet.parents(container_selector).size() <= 0) return;
 				add_link_to_tweet(jq_tweet);
+				if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
+				//var	jq_container = jq_tweet.parents('div.Grid[data-component-term="tweet"]:first,li.js-stream-item:first');
+				var	jq_container = jq_tweet.parents('div.Grid:first,li:first');
+				if (jq_container.parent(container_selector).size() <= 0) return;
+				var	tweet_id = jq_tweet.attr('data-retweet-id') || jq_tweet.attr('data-item-id');
+				if (max_tweet_id.cmp(tweet_id) < 0) {
+					jq_tweet.hide();
+					jq_container.hide();
+					log_debug('*** hide: '+jq_tweet.attr('data-item-id'));
+				}
 			});
 			(jq_target.hasClass('stream-item-activity-me')?jq_target:jq_target.find(activity_selector)).each(function(){
 				var	jq_activity = $(this);
 				add_link_to_activity(jq_activity);
 			});
+			if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
+			(jq_target.hasClass('js-new-tweets-bar')?jq_target:jq_target.find('div.js-new-tweets-bar')).each(function(){
+				var	jq_new_bar = $(this);
+				var	jq_container = jq_new_bar.parent('div.stream-item');
+				if (jq_container.size() <= 0) return;
+				jq_new_bar.hide();
+				jq_container.hide();
+				log_debug('*** hide: new tweets bar');
+			});
 		});
 		
+		var	jq_form404 = $('form.search-404');
+		if (0 < jq_form404.size()) (function(){
+			if (!w.location.href.match(/\/([^/]+)\/status(?:es)?\/(\d+)/)) return;
+			var	tweet_id = RegExp.$2, screen_name = RegExp.$1;
+			var	url_search_list = get_search_url_list(tweet_id, screen_name);
+			var	result = get_jq_link_container(url_search_list, LINK_CONTAINER_CLASS, LINK_TITLE, LINK_TEXT, {'color':LINK_COLOR, 'padding':'4px'});
+			var	jq_link_container = result.container, jq_link = result.link;
+			set_link_to_click(jq_link, function(link, event){
+				//tweet_search(jq_link, event, tweet_id);
+				//	※ 404 の window からは子windowにアクセスできない
+				//		(Google Chrome)
+				//		Uncaught SecurityError: Blocked a frame with origin "https://twitter.com" from accessing a frame with origin "https://twitter.com".
+				//		The frame being accessed set "document.domain" to "twitter.com", but the frame requesting access did not. Both must set "document.domain" to the same value to allow access.
+				var	url_search = jq_link.attr('href'), url_search_shift = jq_link.attr('alt');
+				if (event && event.shiftKey && url_search_shift) url_search = url_search_shift;
+				var	cwin=wopen(url_search);
+				return false;
+			});
+			var	jq_h1 = $('h1:first'), h1_html = jq_h1.html(), html_lang=$('html').attr('lang');
+			var	check = function(){
+				var	jq_h1 = $('h1:first');
+				if (jq_h1.html()==h1_html) {
+					setTimeout(check, INTV_CHECK_MS);
+					return;
+				}
+				jq_h1.append(jq_link);
+			};
+			if (html_lang == LANG || !h1_html.match(/sorry/i)) {
+				jq_h1.append(jq_link);
+			}
+			else {
+				check();
+			}
+		})();
+		if (src_tweet_id) (function(){
+			var	valid_parent = (function(){try{return w.opener.$}catch(e){return null}})();
+			if (valid_parent) return;
+			//	親windowにアクセスできない(親windowからコントロールできない)場合
+			var	jq_link = $('<a/>');
+			jq_link.attr('href', w.location.href);
+			setTimeout(function(){
+				tweet_search(jq_link, null, src_tweet_id, null, w);
+			}, INTV_CHECK_MS);
+		})();
 		log_debug('All set.');
 	};	// end of main_proc()
 	
