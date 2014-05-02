@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02b
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02b1
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -38,10 +38,8 @@ THE SOFTWARE.
 (function(w, d){
 var main = function(w, d){
 	//{ user parameters
-	//var DEBUG = true;
 	var DEBUG = false;
-	//var	DEBUG_USE_CONSOLE_LOG = true;
-	var	DEBUG_USE_CONSOLE_LOG = false;
+	var	DEBUG_USE_CONSOLE_LOG = true;
 	
 	var	HIDE_NEWER_TWEETS = true;
 	
@@ -80,7 +78,7 @@ var main = function(w, d){
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02b';
+	var VER_SCRIPT = '0.02b1';
 	var $=w.$;
 	
 	//{ check environment
@@ -143,11 +141,21 @@ var main = function(w, d){
 	
 	
 	//{ functions
+	var	log = w.log = (function(){
+		var	con = w.console;
+		if (!con || !con.log) return function(){};
+		var	con_log = con.log;
+		return function(str){
+			con_log.call(con, str);
+		};
+	})();	//	end of log()
+	
 	var log_debug = (function(){
 		if (!DEBUG) return function(){};
-		if (DEBUG_USE_CONSOLE_LOG && w.console && w.console.log) {
+		if (DEBUG_USE_CONSOLE_LOG) {
 			return function(str){
-				console.log(NAME_SCRIPT+' ['+new Date().toISOString()+'] '+str);
+				//console.log(NAME_SCRIPT+' ['+new Date().toISOString()+'] '+str);	//	Twitter側で console.log が無効化されているため途中から表示されなくなってしまう
+				log(NAME_SCRIPT+' ['+new Date().toISOString()+'] '+str);
 			};
 		}
 		else {
@@ -438,7 +446,7 @@ var main = function(w, d){
 			var	jq_li_clone = jq_tweet_li.clone(true);
 			jq_li_clone.find(selector).each(function(){
 				$(this).remove();
-				log_debug('removed: '+this.className);
+				//log_debug('removed: '+this.className);
 			});
 			return jq_li_clone;
 		};
@@ -447,6 +455,8 @@ var main = function(w, d){
 	var	tweet_search = function(jq_link, event, tweet_id, time_sec, cwin, target_color, jq_tweet_li_target){
 		var	url_search = jq_link.attr('href'), url_search_shift = jq_link.attr('alt');
 		if (event && event.shiftKey && url_search_shift) url_search = url_search_shift;
+		
+		log_debug('tweet_search() '+url_search);
 		
 		if (url_search.indexOf(API_SEARCH, 0) != 0) jq_tweet_li_target = null;
 		
@@ -531,11 +541,11 @@ var main = function(w, d){
 					return;
 				}
 				target_color = VICINITY_TWEET_COLOR;
-				log_debug('Pattern-B:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
+				log_debug('pattern-b:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
 			}
 			else {
 				if (jq_tweet.attr('data-retweet-id')==tweet_id) target_color = VICINITY_TWEET_COLOR;
-				log_debug('Pattern-A:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
+				log_debug('pattern-a:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
 			}
 			var	jq_tweet_li = (jq_tweet.hasClass('js-stream-item')) ? jq_tweet : jq_tweet.parents('.js-stream-item');
 			if (0 < jq_tweet_li.size()) {
@@ -574,6 +584,9 @@ var main = function(w, d){
 		if (0<jq_container.size()) return;
 		var	tweet_id = jq_tweet.attr('data-item-id'), screen_name = jq_tweet.attr('data-screen-name');
 		if (!tweet_id || !screen_name) return;
+		
+		log_debug('add_link_to_tweet() screen_name:'+screen_name+' tweet_id:'+tweet_id);
+		
 		var	time_sec = parseInt(jq_tweet.find('span[data-time]:first').attr('data-time'));
 		var	url_search_list = get_search_url_list(tweet_id, screen_name, time_sec);
 		var	result = get_jq_link_container(url_search_list, LINK_CONTAINER_CLASS, LINK_TITLE, LINK_TEXT, {'color':LINK_COLOR, 'padding':'4px'});
@@ -609,14 +622,14 @@ var main = function(w, d){
 				set_link_to_click(jq_rt_link, function(link, event){
 					var	cwin = wopen('about:blank');
 					var	callback = function(html){
-						log_debug('callback');
+						//log_debug('callback');
 						for (;;) {
 							if (html.match(/<li\s*class="[\s\S]*?stream-item[\s\S]*?data-item-id="(\d+)"/i)) {
 								var	tweet_id = RegExp.$1;
-								log_debug('tweet_id='+tweet_id);
+								//log_debug('tweet_id='+tweet_id);
 								if (html.match(/<span\s*class="[\s\S]*?_timestamp[\s\S]*?\s*data-time="(\d+)"/i)) {
 									var	time_sec = parseInt(RegExp.$1);
-									log_debug('time_sec='+time_sec);
+									//log_debug('time_sec='+time_sec);
 									var	url_search_list = get_search_url_list(tweet_id, retweeter, time_sec);
 									set_url_list_to_jq_link(jq_rt_link, url_search_list);
 									var	click = function(jq_rt_link2, cwin, link, event){
@@ -757,7 +770,7 @@ var main = function(w, d){
 				if (max_tweet_id.cmp(tweet_id) < 0) {
 					jq_tweet.hide();
 					jq_container.hide();
-					log_debug('*** hide: '+jq_tweet.attr('data-item-id'));
+					//log_debug('hide: '+jq_tweet.attr('data-item-id'));
 				}
 			});
 			(jq_target.hasClass('stream-item-activity-me')?jq_target:jq_target.find(activity_selector)).each(function(){
@@ -771,7 +784,7 @@ var main = function(w, d){
 				if (jq_container.size() <= 0) return;
 				jq_new_bar.hide();
 				jq_container.hide();
-				log_debug('*** hide: new tweets bar');
+				//log_debug('hide: new tweets bar');
 			});
 		});
 		
