@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02b1
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02b2
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -78,7 +78,7 @@ var main = function(w, d){
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02b1';
+	var VER_SCRIPT = '0.02b2';
 	var $=w.$;
 	
 	//{ check environment
@@ -141,6 +141,30 @@ var main = function(w, d){
 	
 	
 	//{ functions
+	if (DEBUG) {
+		var	get_time = (function(){
+			if (window.performance) {
+				return function(){return performance.now()};
+			}
+			else {
+				return function(){return new Date().getTime()};
+			}
+		})();
+		
+		Function.prototype.bench = function(){
+			var self = this;
+			var	fnc_bench = function(){
+				var start = get_time();
+				var rsp = self.apply(this, arguments);
+				var end = get_time();
+				fnc_bench.bench_result.cnt += 1;
+				fnc_bench.bench_result.time += end-start;
+				return rsp;
+			};
+			fnc_bench.bench_result = {cnt:0, time:0};
+			return fnc_bench;
+		};
+	}
 	var	log = w.log = (function(){
 		var	con = w.console;
 		if (!con || !con.log) return function(){};
@@ -576,12 +600,84 @@ var main = function(w, d){
 		check();
 	};	//	end of tweet_search()
 	
+	var	add_container_to_tweet = function(jq_tweet, jq_link_container){
+		var	jq_insert_point = jq_tweet.find('a.ProfileTweet-timestamp').parent();
+		if (jq_insert_point.size()<=0) jq_insert_point = jq_tweet.find('small.time:first');
+		jq_insert_point.after(jq_link_container);
+		jq_tweet.find('div.client-and-actions span.metadata:first').after(jq_link_container.clone(true));
+	};	//	end of add_container_to_tweet()
+	
+	var	add_rtlink_to_tweet = function(jq_tweet){
+		var	retweet_id = jq_tweet.attr('data-retweet-id'), retweeter = jq_tweet.attr('data-retweeter');
+		if (!retweet_id || !retweeter) return;
+		
+		var	id_range = get_id_range(retweet_id);
+		var	url_rt_search_list = get_search_url_list(id_range, retweeter, null, retweet_id);
+		var	result = get_jq_link_container(url_rt_search_list, ACT_CONTAINER_CLASS, ACT_LINK_TITLE, ACT_LINK_TEXT, {'color':ACT_LINK_COLOR, 'padding':'4px'});
+		var	jq_rtlink_container = result.container, jq_rtlink = result.link;
+		
+		var	jq_append_point = jq_tweet.find('div.ProfileTweet-context:first');
+		var	flg_enable_insert = (0 < jq_append_point.size()) ? false : true;
+		
+		if (id_range) {
+			set_link_to_click(jq_rtlink, function(link, event){
+				tweet_search(jq_rtlink, event, retweet_id, null, null, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
+				return false;
+			});
+		}
+		else {
+			set_link_to_click(jq_rtlink, function(link, event){
+				var	cwin = wopen('about:blank');
+				var	callback = function(html){
+					//log_debug('callback');
+					for (;;) {
+						if (html.match(/<li\s*class="[\s\S]*?stream-item[\s\S]*?data-item-id="(\d+)"/i)) {
+							var	tweet_id = RegExp.$1;
+							//log_debug('tweet_id='+tweet_id);
+							if (html.match(/<span\s*class="[\s\S]*?_timestamp[\s\S]*?\s*data-time="(\d+)"/i)) {
+								var	time_sec = parseInt(RegExp.$1);
+								//log_debug('time_sec='+time_sec);
+								var	url_search_list = get_search_url_list(tweet_id, retweeter, time_sec);
+								set_url_list_to_jq_link(jq_rtlink, url_search_list);
+								var	click = function(jq_rtlink2, cwin, link, event){
+									tweet_search(jq_rtlink2, event, tweet_id, time_sec, cwin, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
+									return false;
+								};	//	end of click()
+								break;
+							}
+						}
+						var	click = function(jq_rtlink2, cwin, link, event){
+							tweet_search(jq_rtlink2, event, retweet_id, null, null, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
+							return false;
+						};	//	end of click()
+						break;
+					}
+					var	jq_rtlink2 = jq_rtlink.clone();
+					set_link_to_click(jq_rtlink2, function(link, event){
+						click(jq_rtlink2, cwin)
+					});
+					jq_rtlink.after(jq_rtlink2);
+					jq_rtlink.remove();
+					click(cwin);
+					cwin = null;
+				};	//	end of callback()
+				
+				$.get(url_rt_search, callback, 'html');	//$.ajax({url:url_rt_search, success:callback, dataType:'html'});
+				
+				return false;
+			});
+		}
+		if (jq_append_point.size()<=0) jq_append_point = jq_tweet.find('div.context:first').find('div.with-icn:first');
+		jq_append_point.append(jq_rtlink_container);
+	};	//	end of add_rtlink_to_tweet()
+	
 	var	add_link_to_tweet = function(jq_tweet){
 		//jq_tweet.find('div.proxy-tweet-container small.'+LINK_CONTAINER_CLASS).each(function(){$(this).remove()});
 		//if (0 < jq_tweet.parents('div.proxy-tweet-container').size()) return;
-		if (!jq_tweet.is(':visible')) return;
+		//if (!jq_tweet.is(':visible')) return;	//	このチェックを入れるとかえって遅くなってしまうためコメントアウト
 		var	jq_container = jq_tweet.find('small.'+LINK_CONTAINER_CLASS);
 		if (0<jq_container.size()) return;
+		
 		var	tweet_id = jq_tweet.attr('data-item-id'), screen_name = jq_tweet.attr('data-screen-name');
 		if (!tweet_id || !screen_name) return;
 		
@@ -596,73 +692,9 @@ var main = function(w, d){
 			tweet_search(jq_link, event, tweet_id, time_sec);
 			return false;
 		});
+		add_container_to_tweet(jq_tweet, jq_link_container);
 		
-		var	jq_insert_point = jq_tweet.find('a.ProfileTweet-timestamp').parent();
-		if (jq_insert_point.size()<=0) jq_insert_point = jq_tweet.find('small.time:first');
-		jq_insert_point.after(jq_link_container);
-		jq_tweet.find('div.client-and-actions span.metadata:first').after(jq_link_container.clone(true));
-		
-		var	retweet_id = jq_tweet.attr('data-retweet-id'), retweeter = jq_tweet.attr('data-retweeter');
-		if (retweet_id && retweeter) {
-			var	id_range = get_id_range(retweet_id);
-			var	url_rt_search_list = get_search_url_list(id_range, retweeter, null, retweet_id);
-			var	result = get_jq_link_container(url_rt_search_list, ACT_CONTAINER_CLASS, ACT_LINK_TITLE, ACT_LINK_TEXT, {'color':ACT_LINK_COLOR, 'padding':'4px'});
-			var	jq_rt_link_container = result.container, jq_rt_link = result.link;
-			
-			var	jq_append_point = jq_tweet.find('div.ProfileTweet-context:first');
-			var	flg_enable_insert = (0 < jq_append_point.size()) ? false : true;
-			
-			if (id_range) {
-				set_link_to_click(jq_rt_link, function(link, event){
-					tweet_search(jq_rt_link, event, retweet_id, null, null, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
-					return false;
-				});
-			}
-			else {
-				set_link_to_click(jq_rt_link, function(link, event){
-					var	cwin = wopen('about:blank');
-					var	callback = function(html){
-						//log_debug('callback');
-						for (;;) {
-							if (html.match(/<li\s*class="[\s\S]*?stream-item[\s\S]*?data-item-id="(\d+)"/i)) {
-								var	tweet_id = RegExp.$1;
-								//log_debug('tweet_id='+tweet_id);
-								if (html.match(/<span\s*class="[\s\S]*?_timestamp[\s\S]*?\s*data-time="(\d+)"/i)) {
-									var	time_sec = parseInt(RegExp.$1);
-									//log_debug('time_sec='+time_sec);
-									var	url_search_list = get_search_url_list(tweet_id, retweeter, time_sec);
-									set_url_list_to_jq_link(jq_rt_link, url_search_list);
-									var	click = function(jq_rt_link2, cwin, link, event){
-										tweet_search(jq_rt_link2, event, tweet_id, time_sec, cwin, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
-										return false;
-									};	//	end of click()
-									break;
-								}
-							}
-							var	click = function(jq_rt_link2, cwin, link, event){
-								tweet_search(jq_rt_link2, event, retweet_id, null, null, VICINITY_TWEET_COLOR, flg_enable_insert ? jq_tweet: null);
-								return false;
-							};	//	end of click()
-							break;
-						}
-						var	jq_rt_link2 = jq_rt_link.clone();
-						set_link_to_click(jq_rt_link2, function(link, event){
-							click(jq_rt_link2, cwin)
-						});
-						jq_rt_link.after(jq_rt_link2);
-						jq_rt_link.remove();
-						click(cwin);
-						cwin = null;
-					};	//	end of callback()
-					
-					$.get(url_rt_search, callback, 'html');	//$.ajax({url:url_rt_search, success:callback, dataType:'html'});
-					
-					return false;
-				});
-			}
-			if (jq_append_point.size()<=0) jq_append_point = jq_tweet.find('div.context:first').find('div.with-icn:first');
-			jq_append_point.append(jq_rt_link_container);
-		}
+		add_rtlink_to_tweet(jq_tweet);
 		
 		if (!FLG_TWITSPRITZ || !jq_tweet.parents('div.permalink-tweet-container')[0]) return;
 		
@@ -717,6 +749,15 @@ var main = function(w, d){
 		
 		log_debug('Initializing...');
 		
+		if (DEBUG) {
+			get_search_url_list = get_search_url_list.bench();
+			get_jq_link_container = get_jq_link_container.bench();
+			add_container_to_tweet = add_container_to_tweet.bench();
+			add_rtlink_to_tweet = add_rtlink_to_tweet.bench();
+			add_link_to_tweet = add_link_to_tweet.bench();
+			add_link_to_activity = add_link_to_activity.bench();
+		}
+		
 		var	src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
 		var	max_tweet_id = BigNum(src_tweet_id);
 		
@@ -757,11 +798,13 @@ var main = function(w, d){
 		
 		var	container_selector = container_selector_list.join(',');
 		$(d).bind('DOMNodeInserted', function(e){
+			var	flg_hit = false;
 			var	jq_target = $(e.target);
 			((jq_target.hasClass('js-stream-tweet')||jq_target.hasClass('tweet'))?jq_target:jq_target.find('div.js-stream-tweet,div.tweet')).each(function(){
 				var	jq_tweet = $(this);
 				if (jq_tweet.parents(container_selector).size() <= 0) return;
 				add_link_to_tweet(jq_tweet);
+				flg_hit = true;
 				if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
 				//var	jq_container = jq_tweet.parents('div.Grid[data-component-term="tweet"]:first,li.js-stream-item:first');
 				var	jq_container = jq_tweet.parents('div.Grid:first,li:first');
@@ -776,7 +819,16 @@ var main = function(w, d){
 			(jq_target.hasClass('stream-item-activity-me')?jq_target:jq_target.find(activity_selector)).each(function(){
 				var	jq_activity = $(this);
 				add_link_to_activity(jq_activity);
+				flg_hit = true;
 			});
+			if (DEBUG && flg_hit) {
+				log_debug('add_link_to_tweet(): cnt='+add_link_to_tweet.bench_result.cnt+' time='+add_link_to_tweet.bench_result.time);
+				log_debug('add_link_to_activity(): cnt='+add_link_to_activity.bench_result.cnt+' time='+add_link_to_activity.bench_result.time);
+				log_debug('  get_search_url_list(): cnt='+get_search_url_list.bench_result.cnt+' time='+get_search_url_list.bench_result.time);
+				log_debug('  get_jq_link_container(): cnt='+get_jq_link_container.bench_result.cnt+' time='+get_jq_link_container.bench_result.time);
+				log_debug('  add_container_to_tweet(): cnt='+add_container_to_tweet.bench_result.cnt+' time='+add_container_to_tweet.bench_result.time);
+				log_debug('  add_rtlink_to_tweet(): cnt='+add_rtlink_to_tweet.bench_result.cnt+' time='+add_rtlink_to_tweet.bench_result.time);
+			}
 			if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
 			(jq_target.hasClass('js-new-tweets-bar')?jq_target:jq_target.find('div.js-new-tweets-bar')).each(function(){
 				var	jq_new_bar = $(this);
