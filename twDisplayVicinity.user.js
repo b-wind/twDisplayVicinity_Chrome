@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02b3
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02b4
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -39,7 +39,7 @@ THE SOFTWARE.
 var main = function(w, d){
 	//{ user parameters
 	var DEBUG = false;
-	var DEBUG_USE_CONSOLE_LOG = true;
+	var DEBUG_USE_CONSOLE_LOG = false;
 	
 	var HIDE_NEWER_TWEETS = true;
 	
@@ -78,7 +78,7 @@ var main = function(w, d){
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02b3';
+	var VER_SCRIPT = '0.02b4';
 	var $=w.$;
 	
 	//{ check environment
@@ -166,7 +166,7 @@ var main = function(w, d){
 		};
 	}
 	var log = w.log = (function(){
-		var con = w.console;
+		var con = w.console;	//	タイミングによってはconsolo.log等が既にTwitter側で空関数に置換されている場合がある
 		if (!con || !con.log) return function(){};
 		var con_log = con.log;
 		return function(str){
@@ -402,7 +402,8 @@ var main = function(w, d){
 		else {
 			var id_range = get_id_range(tweet_id, time_sec);
 		}
-		var source_hash = tweet_id ? '#source_id='+tweet_id : '';
+		//var source_hash = tweet_id ? '#source_id='+tweet_id : '';	//	タイミングによってはTwitter側で'#～'が取得前に消されてしまう
+		var source_hash = tweet_id ? '&_source_id='+tweet_id : '';
 		if (id_range) {
 			var since_id=id_range.since_id, max_id=id_range.max_id;
 			search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+source_hash);
@@ -423,7 +424,7 @@ var main = function(w, d){
 	};  //  end of get_search_url_list()
 	
 	var wopen = function(url, cwin){
-		if (cwin) {cwin.location.href = url} else {cwin = w.open(url)}
+		if (cwin) {if (cwin.location.href != url) cwin.location.href = url} else {cwin = w.open(url)}
 		return cwin;
 	};  //  end of wopen
 	
@@ -748,6 +749,7 @@ var main = function(w, d){
 		flg_main_called = true;
 		
 		log_debug('Initializing...');
+		log_debug('document.referrer: '+d.referrer);
 		
 		if (DEBUG) {
 			get_search_url_list = get_search_url_list.bench();
@@ -758,7 +760,8 @@ var main = function(w, d){
 			add_link_to_activity = add_link_to_activity.bench();
 		}
 		
-		var src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
+		//var src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
+		var src_tweet_id = (w.location.href.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
 		var max_tweet_id = BigNum(src_tweet_id);
 		
 		if (HIGH_TIME_RESOLUTION) {
@@ -795,6 +798,7 @@ var main = function(w, d){
 			var jq_activity = $(this);
 			add_link_to_activity(jq_activity);
 		});
+		log_debug('src_tweet_id:'+src_tweet_id);
 		log_debug('max_tweet_id:'+max_tweet_id);
 		
 		var container_selector = container_selector_list.join(',');
@@ -814,7 +818,7 @@ var main = function(w, d){
 				if (max_tweet_id.cmp(tweet_id) < 0) {
 					jq_tweet.hide();
 					jq_container.hide();
-					//log_debug('hide: '+jq_tweet.attr('data-item-id'));
+					log_debug('* notice *: hide '+jq_tweet.attr('data-item-id'));
 				}
 			});
 			(jq_target.hasClass('stream-item-activity-me')?jq_target:jq_target.find(activity_selector)).each(function(){
@@ -837,7 +841,7 @@ var main = function(w, d){
 				if (jq_container.size() <= 0) return;
 				jq_new_bar.hide();
 				jq_container.hide();
-				//log_debug('hide: new tweets bar');
+				log_debug('* notice *: hide new tweets bar');
 			});
 		});
 		
