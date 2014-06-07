@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02b4
+// @description    display the vicinity of a particular tweet on Twitter ver.0.02b5
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -78,7 +78,7 @@ var main = function(w, d){
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02b4';
+	var VER_SCRIPT = '0.02b5';
 	var $=w.$;
 	
 	//{ check environment
@@ -192,6 +192,21 @@ var main = function(w, d){
 			};
 		}
 	})();   //  end of log_debug()
+	
+	var	remove = $.prototype.remove;
+	$.prototype.remove = function(){
+		var	className = this.attr ? this.attr('class') : null;
+		log_debug('* notice *: remove '+className);
+		if (className && (' '+className+' ').match(/ Grid /)) {
+			//	突然タイムラインの特定のツイート(div.Grid要素)が削除され、それ以降のツイートが表示されなくなる不具合あり。(2014/06/08現在)
+			//	本スクリプトを無効化しても再現するため、おそらくTwitter側の問題。
+			//	→div.Grid要素のみ、削除されないよう暫定的にパッチ。
+			//log_debug(this.html());
+			log_debug(' => ignored');
+			return this;
+		}
+		return remove.apply(this, arguments);
+	};
 	
 	var BigNum = (function(){
 		var DIGIT_UNIT_LEN = 7;
@@ -471,7 +486,7 @@ var main = function(w, d){
 			var jq_li_clone = jq_tweet_li.clone(true);
 			jq_li_clone.find(selector).each(function(){
 				$(this).remove();
-				//log_debug('removed: '+this.className);
+				//log_debug('* notice *: remove '+this.className);
 			});
 			return jq_li_clone;
 		};
