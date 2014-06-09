@@ -1,0 +1,61 @@
+{
+  "ext_title": {
+    "message": "twDisplayVicinity"
+  , "description": "The title of the extension."
+  }
+, "ext_description": {
+    "message": "Twitterで特定ツイート前後のタイムラインを表示"
+  , "description": "The description of the extension."
+  }
+, "OPTIONS" : {
+    "message": "twDisplayVicinity"
+  }
+, "SET" : {
+    "message": "設定"
+  }
+, "DEFAULT" : {
+    "message": "デフォルトに戻す"
+  }
+, "HOURS" : {
+    "message": "時間"
+  }
+, "HOUR_AFTER" : {
+    "message": "特定ツイート後のタイムライン表示範囲(時間)"
+  }
+, "DEFAULT_ACTION_ON_CLICK_EVENT" :{
+    "message": "クリック時のデフォルト動作（※[Shift]押下時は逆の動作になります）"
+  }
+, "SHOW_USER_TL": {
+    "message": "ユーザータイムラインを表示（遡れるツイート数に制限あり）"
+  }
+, "SHOW_SEARCH_TL": {
+    "message": "検索タイムラインを表示（RTは非表示）"
+  }
+, "TWITSPRITZ": {
+    "message": "TwitSpritz: Spritzもどき表示"
+  }
+, "TWITSPRITZ_ENABLED": {
+    "message": "有効"
+  }
+, "TWITSPRITZ_DISABLED": {
+    "message": "無効"
+  }
+, "LINK_TEXT_HEADER": {
+    "message": "Link Text (標準)"
+  }
+, "ACT_LINK_TEXT_HEADER": {
+    "message": "Link Text (通知)"
+  }
+, "TS_LINK_TEXT_HEADER": {
+    "message": "Link Text (TwitSpritz)"
+  }
+, "LINK_TEXT": {
+    "message": "近傍"
+  }
+, "ACT_LINK_TEXT": {
+    "message": "近傍"
+  }
+, "TS_LINK_TEXT": {
+    "message": "TwitSpritz"
+  }
+}

@@ -1,15 +1,28 @@
 {
-  "manifest_version": 2,
-  "name": "twDisplayVicinity",
-  "version": "0.2.2.5",
-  "description": "Display the vicinity of a particular tweet on Twitter",
-  "icons": {
+  "manifest_version": 2
+, "name": "__MSG_ext_title__"
+, "version": "0.2.3.0"
+, "description": "__MSG_ext_description__"
+, "default_locale": "ja"
+, "icons": {
     "48": "images/icon_48.png"
   , "96": "images/icon_96.png"
   , "128": "images/icon_128.png"
-  },
-  "content_scripts": [{
-    "matches": ["http://twitter.com/*", "https://twitter.com/*"],
-    "js": ["scripts/twDisplayVicinity.user.js"]
-  }]
+  }
+, "content_scripts": [
+    {
+      "matches": ["http://twitter.com/*", "https://twitter.com/*"]
+    , "js": ["scripts/load_options.js"]
+    , "run_at": "document_start"
+    }
+  , {
+      "matches": ["http://twitter.com/*", "https://twitter.com/*"]
+    , "js": ["scripts/twDisplayVicinity.user.js"]
+    , "run_at": "document_end"
+    }
+  ]
+, "background": {
+    "scripts": ["scripts/background.js"]
+  }
+, "options_page": "options.html"
 }

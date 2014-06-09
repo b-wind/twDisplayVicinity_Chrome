@@ -3,10 +3,11 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    display the vicinity of a particular tweet on Twitter ver.0.02b5
+// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.0)
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
+  Chrome Web Store: https://chrome.google.com/webstore/detail/twdisplayvicinity/anmfeeanmnmdkjlhojpodibignbcfgjm?hl=ja
   GitHub: https://github.com/furyutei/twDisplayVicinity
   Related article: http://d.hatena.ne.jp/furyu-tei/20140327/1395914958
   Original(bookmarklet): http://let.hatelabo.jp/furyu-tei/let/hLHVnMG9q-NH
@@ -41,15 +42,13 @@ var main = function(w, d){
 	var DEBUG = false;
 	var DEBUG_USE_CONSOLE_LOG = false;
 	
-	var HIDE_NEWER_TWEETS = true;
-	
-	var DAY_BEFORE = 1;
-	var DAY_AFTER = 1;
-	
-	//var   HIGH_TIME_RESOLUTION = false;
 	var HIGH_TIME_RESOLUTION = true;
 	var HOUR_BEFORE = 24;   //  enabled if HIGH_TIME_RESOLUTION is true
 	var HOUR_AFTER = 8;     //  enabled if HIGH_TIME_RESOLUTION is true
+	
+	var	USE_SEARCH_TL_BY_DEFAULT = false;
+	
+	var FLG_TWITSPRITZ = false;
 	
 	var TARGET_TWEET_COLOR = 'gold';
 	var VICINITY_TWEET_COLOR = 'pink';
@@ -66,19 +65,21 @@ var main = function(w, d){
 	var EN_ACT_LINK_TEXT = 'vicinity';
 	var EN_ACT_LINK_TITLE = 'search vicinity tweets around action';
 	
-	var FLG_TWITSPRITZ = true;
 	var TS_LINK_COLOR = 'darkgreen';
 	var TS_LINK_TEXT = 'TwitSpritz';
 	var TS_LINK_TITLE = 'TwitSpritz\x3a\x20Spritz\u3082\u3069\u304d\u8868\u793a';   //  "TwitSpritz: Spritzもどき表示"
 	var EN_TS_LINK_TEXT = 'TwitSpritz';
-	var EN_TS_LINK_TITLE = 'TwitSpritz: show tweet like "TwitSpritz"';
+	var EN_TS_LINK_TITLE = 'TwitSpritz: show tweet like "Spritz"';
+	
+	var HIDE_NEWER_TWEETS = true;
+	var DAY_BEFORE = 1;
+	var DAY_AFTER = 1;
 	
 	//} end of user parameters
 	
 	
 	//{ global variables
 	var NAME_SCRIPT = 'twDisplayVicinity';
-	var VER_SCRIPT = '0.02b5';
 	var $=w.$;
 	
 	//{ check environment
@@ -110,6 +111,16 @@ var main = function(w, d){
 		TS_LINK_TEXT = EN_TS_LINK_TEXT;
 		TS_LINK_TITLE = EN_TS_LINK_TITLE;
 	}
+	var	opts = w.twDisplayVicinity_Options;
+	if (opts) {
+		if (opts.USE_SEARCH_TL_BY_DEFAULT !== null) USE_SEARCH_TL_BY_DEFAULT = opts.USE_SEARCH_TL_BY_DEFAULT;
+		if (opts.FLG_TWITSPRITZ !== null) FLG_TWITSPRITZ = opts.FLG_TWITSPRITZ;
+		if (opts.HOUR_AFTER !== null) HOUR_AFTER = opts.HOUR_AFTER;
+		if (opts.LINK_TEXT !== null) LINK_TEXT = opts.LINK_TEXT;
+		if (opts.ACT_LINK_TEXT != null) ACT_LINK_TEXT = opts.ACT_LINK_TEXT;
+		if (opts.TS_LINK_TEXT != null) TS_LINK_TEXT = opts.TS_LINK_TEXT;
+	}
+	
 	var API_SEARCH = 'https://twitter.com/search';
 	var API_TIMELINE_BASE = 'https://twitter.com/';
 	
@@ -435,6 +446,11 @@ var main = function(w, d){
 			}
 		}
 		search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+source_hash);
+		if (USE_SEARCH_TL_BY_DEFAULT && 2 <= search_url_list.length) {
+			var	url_search_shift = search_url_list[0];
+			search_url_list[0] = search_url_list[1];
+			search_url_list[1] = url_search_shift;
+		}
 		return search_url_list;
 	};  //  end of get_search_url_list()
 	
@@ -918,6 +934,18 @@ if (typeof w.$ == 'function') {
 }
 else {
 	var container = d.documentElement;
+	var	isChromeExt=typeof chrome=='object' && chrome.extension;	// Google Chrome Extension
+	if (isChromeExt && w.twDisplayVicinity_Chrome) {
+		var	opts = w.twDisplayVicinity_Options;
+		if (opts === undefined) {
+			var fnc = arguments.callee;
+			setTimeout(function(){fnc(w,d);}, 100);
+			return;
+		}
+		var	script = d.createElement('script');
+		script.textContent = 'window.twDisplayVicinity_Options = '+JSON.stringify(opts)+';';
+		container.appendChild(script);
+	}
 	var script = d.createElement('script');
 	script.textContent = '('+main.toString()+')(window, document);';
 	container.appendChild(script);
