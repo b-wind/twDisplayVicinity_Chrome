@@ -33,6 +33,6 @@ chrome.extension.sendRequest({keys:keys}, function(rsp){
 	,	ACT_LINK_TEXT : (rsp.ACT_LINK_TEXT === undefined) ? null : escape_html(rsp.ACT_LINK_TEXT)
 	,	TS_LINK_TEXT : (rsp.TS_LINK_TEXT === undefined) ? null : escape_html(rsp.TS_LINK_TEXT)
 	};
-	console.log(JSON.stringify(w.twDisplayVicinity_Options));
+	//console.log(JSON.stringify(w.twDisplayVicinity_Options));
 });
 })(window,document);
