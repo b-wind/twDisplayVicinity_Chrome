@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.1)
+// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.2)
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -520,7 +520,7 @@ var main = function(w, d){
 			last_tweet_id = tmp_tweet_id;
 		}, 1000 * WAIT_BEFORE_GIVEUP_SCROLL_SEC);
 		
-		var	remove = null, scrollTo = null;
+		var	remove = null, scrollTo = null, scrollTop = null;
 		var check = function(){
 			var $ = (function(){try{return cwin.$}catch(e){return null}})();
 			if (!$) {
@@ -547,7 +547,17 @@ var main = function(w, d){
 				cwin.scrollTo = function(){
 					//	タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合(Twitter側の問題か？、2014/06/10現在)を抑制
 					log_debug('* notice *: scrollTo() ignored');
-				};	//	cwin.scrollTo()
+				};	//	end of cwin.scrollTo()
+				
+				scrollTop = $.prototype.scrollTop;
+				$.prototype.scrollTop = function(){
+					if (0 < arguments.length) {
+						//	タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合(Twitter側の問題か？、2014/07/01現在)を抑制
+						log_debug('* notice *: scrollTop() ignored');
+						return this;
+					}
+					return scrollTop.apply(this, arguments);
+				};	//	end of $.prototype.scrollTop()
 			}
 			if (!jq_items) {
 				jq_items = $([
@@ -805,6 +815,7 @@ var main = function(w, d){
 		//var src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
 		var src_tweet_id = (w.location.href.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
 		var max_tweet_id = BigNum(src_tweet_id);
+		var max_id_from_url = (w.location.href.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
 		
 		if (HIGH_TIME_RESOLUTION) {
 			ID_BEFORE = BigNum.mul(ID_INC_PER_SEC, SEC_BEFORE);
@@ -842,6 +853,7 @@ var main = function(w, d){
 		});
 		log_debug('src_tweet_id:'+src_tweet_id);
 		log_debug('max_tweet_id:'+max_tweet_id);
+		log_debug('max_id_from_url:'+max_id_from_url);
 		
 		var container_selector = container_selector_list.join(',');
 		$(d).bind('DOMNodeInserted', function(e){
@@ -852,7 +864,7 @@ var main = function(w, d){
 				if (jq_tweet.parents(container_selector).size() <= 0) return;
 				add_link_to_tweet(jq_tweet);
 				flg_hit = true;
-				if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
+				if (!HIDE_NEWER_TWEETS || (!src_tweet_id && !max_id_from_url)) return;
 				//var   jq_container = jq_tweet.parents('div.Grid[data-component-term="tweet"]:first,li.js-stream-item:first');
 				var jq_container = jq_tweet.parents('div.Grid:first,li:first');
 				if (jq_container.parent(container_selector).size() <= 0) return;
@@ -876,7 +888,7 @@ var main = function(w, d){
 				log_debug('  add_container_to_tweet(): cnt='+add_container_to_tweet.bench_result.cnt+' time='+add_container_to_tweet.bench_result.time);
 				log_debug('  add_rtlink_to_tweet(): cnt='+add_rtlink_to_tweet.bench_result.cnt+' time='+add_rtlink_to_tweet.bench_result.time);
 			}
-			if (!HIDE_NEWER_TWEETS || !src_tweet_id) return;
+			if (!HIDE_NEWER_TWEETS || (!src_tweet_id && !max_id_from_url)) return;
 			(jq_target.hasClass('js-new-tweets-bar')?jq_target:jq_target.find('div.js-new-tweets-bar')).each(function(){
 				var jq_new_bar = $(this);
 				var jq_container = jq_new_bar.parent('div.stream-item');
