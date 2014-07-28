@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/furyu-tei
 // @include        http://twitter.com/*
 // @include        https://twitter.com/*
-// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.2)
+// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.3)
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -91,7 +91,14 @@ var main = function(w, d){
 				if ((' '+forms[ci].className+' ').match(/ search-404 /)) {
 					var script = d.createElement('script');
 					script.id = NAME_SCRIPT+'_jq';
-					script.src='//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js';
+					//script.src='//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js';
+					// ※ 2014/07/28: 外部スクリプトに制限がかけられた模様
+					//  (Google Chrome)
+					//    Refused to load the script 'https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js'
+					//    because it violates the following Content Security Policy directive: "script-src chrome-extension://*** 'unsafe-inline' 'unsafe-eval' https://abs.twimg.com https://ssl.google-analytics.com about:".
+					var	src = localStorage[NAME_SCRIPT+'_jq_src'];
+					if (!src) src='https://abs.twimg.com/c/swift/ja/init.392eedd8bfc39a754c1ad7cd3cbea06190bdb59e.js';
+					script.src=src;
 					d.body.appendChild(script);
 					break;
 				}
@@ -99,7 +106,10 @@ var main = function(w, d){
 		}
 		var main = arguments.callee; setTimeout(function(){main(w,d);}, 100); return;
 	}
+	
 	w[NAME_SCRIPT+'_touched'] = true;
+	var	jq_script = $('script[src*="//abs.twimg.com/"][src*="/init."]:first');
+	if (0 < jq_script.size()) localStorage[NAME_SCRIPT+'_jq_src'] = jq_script.attr('src');
 	//} end of check environment
 	
 	var LANG = (function(){try{return (w.navigator.browserLanguage || w.navigator.language || w.navigator.userLanguage).substr(0,2)}catch(e){return 'en'}})();
@@ -458,6 +468,7 @@ var main = function(w, d){
 		//jq_link.click(onclick);
 		jq_link.attr('onclick', 'javascript:return '+FNAME_ON_CLICK+'(this, window.event||event)');
 		//  jq_link.click(onclick) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
+		jq_link.attr('target', '_blank');	//	CSPによるonclick(インラインイベントハンドラ)使用禁止対策
 	};  //  end of set_link_to_click()
 	
 	var set_url_list_to_jq_link = function(jq_link, url_search_list){
@@ -935,7 +946,8 @@ var main = function(w, d){
 		})();
 		if (src_tweet_id) (function(){
 			var valid_parent = (function(){try{return w.opener.$}catch(e){return null}})();
-			if (valid_parent) return;
+			//if (valid_parent) return;
+			if (valid_parent && w.opener.$('form.search-404').size() <= 0) return;
 			//  親windowにアクセスできない(親windowからコントロールできない)場合
 			var jq_link = $('<a/>');
 			jq_link.attr('href', w.location.href);
@@ -956,6 +968,17 @@ if (typeof w.$ == 'function') {
 	main(w, d);
 }
 else {
+	var ua = window.navigator.userAgent.toLowerCase();
+	if (ua.indexOf('chrome') < 0) {
+		var forms = d.getElementsByTagName('form');
+		for (var ci=0,len=forms.length; ci<len; ci++) {
+			if ((' '+forms[ci].className+' ').match(/ search-404 /)) {
+				//	※ 404画面では CSP によりインラインスクリプトが禁止されている
+				main(w, d);
+				return;
+			}
+		}
+	}
 	var container = d.documentElement;
 	var	isChromeExt=typeof chrome=='object' && chrome.extension;	// Google Chrome Extension
 	if (isChromeExt && w.twDisplayVicinity_Chrome) {
