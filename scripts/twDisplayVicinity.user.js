@@ -468,6 +468,7 @@ var main = function(w, d){
 		//jq_link.click(onclick);
 		jq_link.attr('onclick', 'javascript:return '+FNAME_ON_CLICK+'(this, window.event||event)');
 		//  jq_link.click(onclick) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
+		jq_link.attr('target', '_blank');	//	CSPによるonclick(インラインイベントハンドラ)使用禁止対策
 	};  //  end of set_link_to_click()
 	
 	var set_url_list_to_jq_link = function(jq_link, url_search_list){
@@ -967,6 +968,17 @@ if (typeof w.$ == 'function') {
 	main(w, d);
 }
 else {
+	var ua = window.navigator.userAgent.toLowerCase();
+	if (ua.indexOf('chrome') < 0) {
+		var forms = d.getElementsByTagName('form');
+		for (var ci=0,len=forms.length; ci<len; ci++) {
+			if ((' '+forms[ci].className+' ').match(/ search-404 /)) {
+				//	※ 404画面では CSP によりインラインスクリプトが禁止されている
+				main(w, d);
+				return;
+			}
+		}
+	}
 	var container = d.documentElement;
 	var	isChromeExt=typeof chrome=='object' && chrome.extension;	// Google Chrome Extension
 	if (isChromeExt && w.twDisplayVicinity_Chrome) {
