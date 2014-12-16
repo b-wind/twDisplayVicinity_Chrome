@@ -6,7 +6,7 @@ twDisplayVicinity
 　対象ブラウザ： Firefox（[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)が必要）、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）
 
 
-■ 近隣ツイート検索（twDisplayVicinity）とは？
+■ 近傍ツイート検索（twDisplayVicinity）とは？
 ---
 [Twitterの公式Webサイト](https://twitter.com/) で、特定ツイートの前後のツイートをタイムライン形式で表示するユーザースクリプトです。  
 あるツイートの前後で、同じ人が何をつぶやいているか知りたい、といった場合に便利です。  
