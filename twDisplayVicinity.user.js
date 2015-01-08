@@ -1,9 +1,11 @@
 // ==UserScript==
-// @name           twDisplayVicinity
-// @namespace      http://d.hatena.ne.jp/furyu-tei
-// @include        http://twitter.com/*
-// @include        https://twitter.com/*
-// @description    Display the vicinity of a particular tweet on Twitter. (version 0.2.3.4)
+// @name            twDisplayVicinity
+// @namespace       http://d.hatena.ne.jp/furyu-tei
+// @author          furyu
+// @version         0.2.3.5
+// @include         http://twitter.com/*
+// @include         https://twitter.com/*
+// @description     Display the vicinity of a particular tweet on Twitter.
 // ==/UserScript==
 /*
   Download: https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js
@@ -37,10 +39,13 @@ THE SOFTWARE.
 */
 
 (function(w, d){
+
+if (w !== w.parent) return;
+
 var main = function(w, d){
     //{ user parameters
     var DEBUG = false;
-    var DEBUG_USE_CONSOLE_LOG = false;
+    var DEBUG_USE_CONSOLE_LOG = true;
     
     var HIGH_TIME_RESOLUTION = true;
     var HOUR_BEFORE = 24;   //  enabled if HIGH_TIME_RESOLUTION is true
@@ -187,11 +192,14 @@ var main = function(w, d){
         };
     }
     var log = w.log = (function(){
-        var con = w.console;    //  タイミングによってはconsolo.log等が既にTwitter側で空関数に置換されている場合がある
-        if (!con || !con.log) return function(){};
-        var con_log = con.log;
+        //var con = w.console;    //  タイミングによってはconsolo.log等が既にTwitter側で空関数に置換されている場合がある
+        //if (!con || !con.log) return function(){};
+        //var con_log = con.log;
+        //return function(str){
+        //  con_log.call(con, str);
+        //};
         return function(str){
-            con_log.call(con, str);
+            console.error(str);
         };
     })();   //  end of log()
     
@@ -393,12 +401,12 @@ var main = function(w, d){
         return dt.getUTCFullYear() + '-' + (1 + dt.getUTCMonth()) + '-' + dt.getUTCDate();
     };  //  end of get_date_str()
     
-    var get_id_from_utc_sec = function(utc_sec) {
+    var get_id_from_utc_sec = function(utc_sec){
         var twepoc = ~~(utc_sec) - TWEPOCH;
         return BigNum.mul(ID_INC_PER_SEC, twepoc);
     };  //  end of get_id_from_utc_sec()
     
-    var get_id_range = function(tweet_id, time_sec) {
+    var get_id_range = function(tweet_id, time_sec){
         var id_range = null;
         for (;;) {
             if (!ID_BEFORE || !ID_AFTER || (!tweet_id && !time_sec)) break;
@@ -543,7 +551,7 @@ var main = function(w, d){
                 $.prototype.remove = function(){
                     var className = this.attr ? this.attr('class') : null;
                     log_debug('* notice *: remove element class='+className);
-                    if (className && (' '+className+' ').match(/ Grid /)) {
+                    if (cwin.location.href.match(/(?:#|&_)source_id=\d+/) && className && (' '+className+' ').match(/ Grid /)) {
                         //  突然タイムラインの特定のツイート(div.Grid要素)が削除され、それ以降のツイートが表示されなくなる不具合あり。(2014/06/08現在)
                         //  本スクリプトを無効化しても再現するため、おそらくTwitter側の問題。
                         //  →div.Grid要素のみ、削除されないよう暫定的にパッチ。
@@ -556,13 +564,17 @@ var main = function(w, d){
                 
                 scrollTo = cwin.scrollTo;
                 cwin.scrollTo = function(){
-                    //  タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合(Twitter側の問題か？、2014/06/10現在)を抑制
-                    log_debug('* notice *: scrollTo() ignored');
+                    if (cwin.location.href.match(/(?:#|&_)source_id=\d+/)) {
+                        //  タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合(Twitter側の問題か？、2014/06/10現在)を抑制
+                        log_debug('* notice *: scrollTo() ignored');
+                        return;
+                    }
+                    return scrollTo.apply(this, arguments);
                 };  //  end of cwin.scrollTo()
                 
                 scrollTop = $.prototype.scrollTop;
                 $.prototype.scrollTop = function(){
-                    if (0 < arguments.length) {
+                    if (cwin.location.href.match(/(?:#|&_)source_id=\d+/) && 0 < arguments.length) {
                         //  タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合(Twitter側の問題か？、2014/07/01現在)を抑制
                         log_debug('* notice *: scrollTop() ignored');
                         return this;
@@ -823,10 +835,12 @@ var main = function(w, d){
             add_link_to_activity = add_link_to_activity.bench();
         }
         
-        //var src_tweet_id = (w.location.href.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
-        var src_tweet_id = (w.location.href.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
+        var current_url = w.location.href;
+        
+        //var src_tweet_id = (current_url.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
+        var src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
         var max_tweet_id = BigNum(src_tweet_id);
-        var max_id_from_url = (w.location.href.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
+        var max_id_from_url = (current_url.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
         
         if (HIGH_TIME_RESOLUTION) {
             ID_BEFORE = BigNum.mul(ID_INC_PER_SEC, SEC_BEFORE);
@@ -868,6 +882,16 @@ var main = function(w, d){
         
         var container_selector = container_selector_list.join(',');
         $(d).bind('DOMNodeInserted', function(e){
+            if (current_url != w.location.href) {
+                current_url = w.location.href;
+                src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
+                max_tweet_id = BigNum(src_tweet_id);
+                max_id_from_url = (current_url.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
+                log_debug('*** URL changed');
+                log_debug('src_tweet_id:'+src_tweet_id);
+                log_debug('max_tweet_id:'+max_tweet_id);
+                log_debug('max_id_from_url:'+max_id_from_url);
+            }
             var flg_hit = false;
             var jq_target = $(e.target);
             ((jq_target.hasClass('js-stream-tweet')||jq_target.hasClass('tweet'))?jq_target:jq_target.find('div.js-stream-tweet,div.tweet')).each(function(){
@@ -876,7 +900,6 @@ var main = function(w, d){
                 add_link_to_tweet(jq_tweet);
                 flg_hit = true;
                 if (!HIDE_NEWER_TWEETS || (!src_tweet_id && !max_id_from_url)) return;
-                
                 //var   jq_container = jq_tweet.parents('div.Grid[data-component-term="tweet"]:first,li.js-stream-item:first');
                 //var jq_container = jq_tweet.parents('div.Grid:first,li:first');
                 //if (jq_container.parent(container_selector).size() <= 0) return;
@@ -924,7 +947,7 @@ var main = function(w, d){
         
         var jq_form404 = $('form.search-404');
         if (0 < jq_form404.size()) (function(){
-            if (!w.location.href.match(/\/([^/]+)\/status(?:es)?\/(\d+)/)) return;
+            if (!current_url.match(/\/([^/]+)\/status(?:es)?\/(\d+)/)) return;
             var tweet_id = RegExp.$2, screen_name = RegExp.$1;
             var url_search_list = get_search_url_list(tweet_id, screen_name);
             var result = get_jq_link_container(url_search_list, LINK_CONTAINER_CLASS, LINK_TITLE, LINK_TEXT, {'color':LINK_COLOR, 'padding':'4px'});
@@ -962,7 +985,7 @@ var main = function(w, d){
             if (valid_parent && w.opener.$('form.search-404').size() <= 0) return;
             //  親windowにアクセスできない(親windowからコントロールできない)場合
             var jq_link = $('<a/>');
-            jq_link.attr('href', w.location.href);
+            jq_link.attr('href', current_url);
             setTimeout(function(){
                 tweet_search(jq_link, null, src_tweet_id, null, w);
             }, INTV_CHECK_MS);
