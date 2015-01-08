@@ -1,9 +1,9 @@
 twDisplayVicinity
 =================
 【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト  
-　License: The MIT license  
-　Copyright (c) 2014 風柳(furyu)  
-　対象ブラウザ： Firefox（[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)が必要）、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）
+- License: The MIT license  
+- Copyright (c) 2014 風柳(furyu)  
+- 対象ブラウザ： Firefox（[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)が必要）、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）
 
 
 ■ 近傍ツイート検索（twDisplayVicinity）とは？
@@ -25,7 +25,16 @@ twDisplayVicinity
 クリックすると、自分のツイートをRTした前後で、その人が何をつぶやいているかがわかります。  
 
 
-■ インストールと使い方
+■ インストール方法
+---
+[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)を入れたFirefox、もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chromeにて、  
+
+> [twDisplayVicinity.user.js](https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js)  
+
+をクリックし、指示に従ってインストール。  
+
+
+■ 使い方
 ---
 下記の記事をご参照ください。  
 [【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作](http://d.hatena.ne.jp/furyu-tei/20140327/1395914958)
@@ -40,3 +49,10 @@ Google Chrome用には、[専用版（拡張機能）](https://chrome.google.com
 
 詳細は、下記の記事をご参照ください。  
 [【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開](http://d.hatena.ne.jp/furyu-tei/20140609/twDisplayVicinity)
+
+
+■ 関連記事
+---
+- [【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20140327/1395914958)  
+- [【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20140609/twDisplayVicinity)
+- [Google ChromeへのTampermonkeyのインストールと基本的な使い方 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20141227/1419609930)  
