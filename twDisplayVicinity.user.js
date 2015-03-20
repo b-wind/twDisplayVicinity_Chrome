@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.5
+// @version         0.2.3.6
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -473,10 +473,12 @@ var main = function(w, d){
         var link_id = LINK_ID_PREFIX+(LINK_ID_NUM++);
         jq_link.attr('id', link_id);
         LINK_DICT[link_id] = onclick;
-        //jq_link.click(onclick);
-        jq_link.attr('onclick', 'javascript:return '+FNAME_ON_CLICK+'(this, window.event||event)');
-        //  jq_link.click(onclick) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
-        jq_link.attr('target', '_blank');   //  CSPによるonclick(インラインイベントハンドラ)使用禁止対策
+        jq_link.click(onclick);
+        
+        // [2015.03.20] CSP設定変更により、onclick 属性だと動作しなくなった
+        //jq_link.attr('onclick', 'javascript:return '+FNAME_ON_CLICK+'(this, window.event||event)');
+        ////  jq_link.click(onclick) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
+        //jq_link.attr('target', '_blank');   //  CSPによるonclick(インラインイベントハンドラ)使用禁止対策
     };  //  end of set_link_to_click()
     
     var set_url_list_to_jq_link = function(jq_link, url_search_list){
@@ -945,6 +947,15 @@ var main = function(w, d){
             });
         });
         
+        $(d).mouseover(function(e){
+            var jq_target = $(e.target);
+            var onclick = LINK_DICT[jq_target.attr('id')];
+            if (onclick) {
+                jq_target.unbind('click');
+                jq_target.click(onclick);
+            }
+        });
+        
         var jq_form404 = $('form.search-404');
         if (0 < jq_form404.size()) (function(){
             if (!current_url.match(/\/([^/]+)\/status(?:es)?\/(\d+)/)) return;
@@ -1015,6 +1026,8 @@ else {
         }
     }
     var container = d.documentElement;
+    var scripts = d.querySelectorAll('script[nonce]');
+    var nonce = (0 < scripts.length) ? scripts[0].getAttribute('nonce') : null;
     var isChromeExt=typeof chrome=='object' && chrome.extension;    // Google Chrome Extension
     if (isChromeExt && w.twDisplayVicinity_Chrome) {
         var opts = w.twDisplayVicinity_Options;
@@ -1024,10 +1037,12 @@ else {
             return;
         }
         var script = d.createElement('script');
+        if (nonce) script.setAttribute('nonce', nonce);
         script.textContent = 'window.twDisplayVicinity_Options = '+JSON.stringify(opts)+';';
         container.appendChild(script);
     }
     var script = d.createElement('script');
+    if (nonce) script.setAttribute('nonce', nonce);
     script.textContent = '('+main.toString()+')(window, document);';
     container.appendChild(script);
 }
