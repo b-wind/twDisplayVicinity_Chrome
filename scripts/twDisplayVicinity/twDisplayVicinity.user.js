@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.6
+// @version         0.2.3.7
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -473,7 +473,11 @@ var main = function(w, d){
         var link_id = LINK_ID_PREFIX+(LINK_ID_NUM++);
         jq_link.attr('id', link_id);
         LINK_DICT[link_id] = onclick;
-        jq_link.click(onclick);
+        jq_link.click(function(event){
+            var link = $(this);
+            onclick(link, event);
+            return false;
+        });
         
         // [2015.03.20] CSP設定変更により、onclick 属性だと動作しなくなった
         //jq_link.attr('onclick', 'javascript:return '+FNAME_ON_CLICK+'(this, window.event||event)');
@@ -732,11 +736,13 @@ var main = function(w, d){
                     }
                     var jq_rtlink2 = jq_rtlink.clone();
                     set_link_to_click(jq_rtlink2, function(link, event){
-                        click(jq_rtlink2, cwin)
+                        //click(jq_rtlink2, cwin)
+                        click(jq_rtlink2, cwin, link, event);
                     });
                     jq_rtlink.after(jq_rtlink2);
                     jq_rtlink.remove();
-                    click(cwin);
+                    //click(cwin);
+                    click(jq_rtlink2, cwin, link, event);
                     cwin = null;
                 };  //  end of callback()
                 
@@ -952,7 +958,11 @@ var main = function(w, d){
             var onclick = LINK_DICT[jq_target.attr('id')];
             if (onclick) {
                 jq_target.unbind('click');
-                jq_target.click(onclick);
+                jq_target.click(function(event){
+                    var link = $(this);
+                    onclick(link, event);
+                    return false;
+                });
             }
         });
         
