@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.7
+// @version         0.2.3.8
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -879,7 +879,7 @@ var main = function(w, d){
             var tweet_id = jq_tweet.attr('data-retweet-id') || jq_tweet.attr('data-item-id');
             if (max_tweet_id.cmp(tweet_id) < 0) max_tweet_id = BigNum(tweet_id);
         });
-        var activity_selector = 'div.stream-item-activity-me[data-activity-type]';
+        var activity_selector = 'div.stream-item-activity-notification[data-activity-type]';
         $(activity_selector).each(function(){
             var jq_activity = $(this);
             add_link_to_activity(jq_activity);
@@ -929,7 +929,7 @@ var main = function(w, d){
                     log_debug('* notice *: hide '+jq_tweet.attr('data-item-id'));
                 }
             });
-            (jq_target.hasClass('stream-item-activity-me')?jq_target:jq_target.find(activity_selector)).each(function(){
+            (jq_target.hasClass('stream-item-activity-notification')?jq_target:jq_target.find(activity_selector)).each(function(){
                 var jq_activity = $(this);
                 add_link_to_activity(jq_activity);
                 flg_hit = true;
