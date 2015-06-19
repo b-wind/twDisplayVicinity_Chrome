@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.8
+// @version         0.2.3.9
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -158,7 +158,8 @@ var main = function(w, d){
     var ID_INC_PER_SEC = 1000*(0x01 << 22);
     var SEC_BEFORE = HOUR_BEFORE * 3600;
     var SEC_AFTER = HOUR_AFTER * 3600;
-    var TWEPOCH = ~~(1288834974657/1000);   //  1288834974.657 sec (2011.11.04 01:42:54(UTC)) (via http://www.slideshare.net/pfi/id-15755280)
+    var TWEPOCH_MSEC = 1288834974657;
+    var TWEPOCH = ~~(TWEPOCH_MSEC/1000);   //  1288834974.657 sec (2011.11.04 01:42:54(UTC)) (via http://www.slideshare.net/pfi/id-15755280)
     var ID_THRESHOLD = '300000000000000';   //  2010.11.04 22時(UTC)頃に、IDが 30000000000以下から300000000000000以上に切り替え
     var ID_BEFORE = null;
     var ID_AFTER = null;
@@ -421,6 +422,17 @@ var main = function(w, d){
         return id_range;
     };  //  end of get_id_range()
     
+    var	zero_padding = function(num, len){
+        if (!len && len !== 0) len = 2;
+        if (len <= ('' + num).length) return '' + num;
+        return ('0000000000'+num).slice(-len);
+    };
+    
+    var get_gmt_from_tweet_id = function(tweet_id, offset_sec) {
+        var date = new Date(TWEPOCH_MSEC + ((offset_sec) ? 1000 * offset_sec : 0) + (tweet_id / (1<<22)));
+        return [date.getUTCFullYear(), zero_padding(1 + date.getUTCMonth()), zero_padding(date.getUTCDate())].join('-') + '_' + [zero_padding(date.getUTCHours()), zero_padding(date.getUTCMinutes()), zero_padding(date.getUTCSeconds())].join(':') + '_GMT';
+    }   // end of get_gmt_from_tweet_id()
+    
     var get_search_url_list = function(tweet_id, screen_name, time_sec, max_id){
         var search_url_list = [];
         var query=null;
@@ -435,20 +447,28 @@ var main = function(w, d){
         var source_hash = tweet_id ? '&_source_id='+tweet_id : '';
         if (id_range) {
             var since_id=id_range.since_id, max_id=id_range.max_id;
-            search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+source_hash);
-            query = 'from:'+screen_name+' since_id:'+since_id+' max_id:'+max_id;
+            search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+            //query = 'from:'+screen_name+' since_id:'+since_id+' max_id:'+max_id;
+            var since = get_gmt_from_tweet_id(since_id), until = get_gmt_from_tweet_id(max_id, 1);
+            query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
         }
         if (!query) {
             if (time_sec) {
                 var since = get_date_str(time_sec-3600*24*DAY_BEFORE), until = get_date_str(time_sec+3600*24*(1+DAY_AFTER));
-                query = 'from:'+screen_name+' since:'+since+' until:'+until;
+                query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
             }
             else {
-                search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id='+max_id+source_hash);
-                query = 'from:'+screen_name+' max_id:'+max_id;
+                search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+                if (BigNum.cmp(max_id, ID_THRESHOLD) < 0) {
+                    query = 'from:' + screen_name + ' max_id:' + max_id;
+                }
+                else {
+                    query = 'from:' + screen_name + ' until:' + get_gmt_from_tweet_id(max_id, 1);
+                }
             }
         }
-        search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+source_hash);
+        //search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+source_hash);
+        search_url_list.push(API_SEARCH + '?q='+encodeURIComponent(query) + '&f=tweets' + source_hash);
         if (USE_SEARCH_TL_BY_DEFAULT && 2 <= search_url_list.length) {
             var url_search_shift = search_url_list[0];
             search_url_list[0] = search_url_list[1];
@@ -520,6 +540,7 @@ var main = function(w, d){
     
     var tweet_search = function(jq_link, event, tweet_id, time_sec, cwin, target_color, jq_tweet_li_target){
         var url_search = jq_link.attr('href'), url_search_shift = jq_link.attr('alt');
+        var url_search_tweets = (url_search && url_search.indexOf(API_SEARCH, 0) == 0) ? url_search : ( (url_search_shift && url_search_shift.indexOf(API_SEARCH, 0) == 0) ? url_search_shift : null );
         if (event && event.shiftKey && url_search_shift) url_search = url_search_shift;
         
         log_debug('tweet_search() '+url_search);
@@ -609,6 +630,16 @@ var main = function(w, d){
             }
             if (!jq_tweet || jq_tweet.size() < 1) {
                 jq_tweet = null;
+                if ($('.empty-text').is(':visible')) {
+                    // https://～/with_replies で「@～さんはまだツイートしていません。」が表示される場合、https://twitter.com/search の方へ移動
+                    if (url_search_tweets && url_search_tweets != url_search) {
+                        setTimeout(function(){
+                            cwin.location.href = url_search_tweets;
+                        }, 100);
+                    }
+                    log_debug('empty text');
+                    return;
+                }
                 jq_items.find('div.js-stream-tweet:not(".'+NAME_SCRIPT+'_touched")[data-item-id]').each(function(){
                     var jq_tmp = $(this);
                     jq_tmp.addClass(NAME_SCRIPT+'_touched');
@@ -1003,7 +1034,7 @@ var main = function(w, d){
         if (src_tweet_id) (function(){
             var valid_parent = (function(){try{return w.opener.$}catch(e){return null}})();
             //if (valid_parent) return;
-            if (valid_parent && w.opener.$('form.search-404').size() <= 0) return;
+            if (valid_parent && w.opener.$('form.search-404').size() <= 0 && w.history.length < 2) return;
             //  親windowにアクセスできない(親windowからコントロールできない)場合
             var jq_link = $('<a/>');
             jq_link.attr('href', current_url);
