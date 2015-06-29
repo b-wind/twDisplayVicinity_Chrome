@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.9
+// @version         0.2.3.10
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -447,7 +447,8 @@ var main = function(w, d){
         var source_hash = tweet_id ? '&_source_id='+tweet_id : '';
         if (id_range) {
             var since_id=id_range.since_id, max_id=id_range.max_id;
-            search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+            //search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+            search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_position=' + max_id + source_hash);
             //query = 'from:'+screen_name+' since_id:'+since_id+' max_id:'+max_id;
             var since = get_gmt_from_tweet_id(since_id), until = get_gmt_from_tweet_id(max_id, 1);
             query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
@@ -458,7 +459,8 @@ var main = function(w, d){
                 query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
             }
             else {
-                search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+                //search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_id=' + max_id + source_hash);
+                search_url_list.push(API_TIMELINE_BASE + screen_name + '/with_replies?max_position=' + max_id + source_hash);
                 if (BigNum.cmp(max_id, ID_THRESHOLD) < 0) {
                     query = 'from:' + screen_name + ' max_id:' + max_id;
                 }
@@ -879,7 +881,7 @@ var main = function(w, d){
         //var src_tweet_id = (current_url.match(/#source_id=(\d+)/)) ? RegExp.$1 : 0;
         var src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
         var max_tweet_id = BigNum(src_tweet_id);
-        var max_id_from_url = (current_url.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
+        var max_id_from_url = (current_url.match(/(?:#|&|\?)max_(?:id|position)=(\d+)/)) ? RegExp.$1 : 0;
         
         if (HIGH_TIME_RESOLUTION) {
             ID_BEFORE = BigNum.mul(ID_INC_PER_SEC, SEC_BEFORE);
@@ -925,7 +927,7 @@ var main = function(w, d){
                 current_url = w.location.href;
                 src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
                 max_tweet_id = BigNum(src_tweet_id);
-                max_id_from_url = (current_url.match(/(?:#|&|\?)max_id=(\d+)/)) ? RegExp.$1 : 0;
+                max_id_from_url = (current_url.match(/(?:#|&|\?)max_(?:id|position)=(\d+)/)) ? RegExp.$1 : 0;
                 log_debug('*** URL changed');
                 log_debug('src_tweet_id:'+src_tweet_id);
                 log_debug('max_tweet_id:'+max_tweet_id);
