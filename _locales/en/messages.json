@@ -3,6 +3,10 @@
     "message": "twDisplayVicinity",
     "description": "The title of the extension."
   }
+, "ext_short_name": {
+    "message": "TWDV"
+  , "description": "The short version of the extension's name."
+  }
 , "ext_description": {
     "message": "Display the vicinity of a particular tweet on Twitter.",
     "description": "The description of the extension."

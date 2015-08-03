@@ -1,14 +1,18 @@
 {
   "ext_title": {
-    "message": "twDisplayVicinity"
+    "message": "近傍ツイート検索 (twDisplayVicinity)"
   , "description": "The title of the extension."
+  }
+, "ext_short_name": {
+    "message": "TWDV"
+  , "description": "The short version of the extension's name."
   }
 , "ext_description": {
     "message": "Twitterで特定ツイート前後のタイムラインを表示"
   , "description": "The description of the extension."
   }
 , "OPTIONS" : {
-    "message": "twDisplayVicinity"
+    "message": "近傍ツイート検索 (twDisplayVicinity)"
   }
 , "SET" : {
     "message": "設定"
