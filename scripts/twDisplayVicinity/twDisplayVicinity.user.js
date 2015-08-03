@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.10
+// @version         0.2.3.11
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -151,9 +151,9 @@ var main = function(w, d){
     var LINK_DICT = {};
     var LINK_ID_NUM = 1;
     
-    var INTV_CHECK_MS = 300;    // ms
-    var MAX_CHECK_RETRY = 3;
-    var WAIT_BEFORE_GIVEUP_SCROLL_SEC = 10;
+    var INTV_CHECK_MS = 300; // チェック間隔(単位：ms)
+    var MAX_CHECK_RETRY = 10; // 'div.stream-end' 要素が表示されてから、チェックを終了するまでのリトライ回数(タイミングにより、いったん表示されてもまた消える場合がある)
+    var WAIT_BEFORE_GIVEUP_SCROLL_SEC = 10; // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
     
     var ID_INC_PER_SEC = 1000*(0x01 << 22);
     var SEC_BEFORE = HOUR_BEFORE * 3600;
@@ -422,7 +422,7 @@ var main = function(w, d){
         return id_range;
     };  //  end of get_id_range()
     
-    var	zero_padding = function(num, len){
+    var zero_padding = function(num, len){
         if (!len && len !== 0) len = 2;
         if (len <= ('' + num).length) return '' + num;
         return ('0000000000'+num).slice(-len);
@@ -573,6 +573,7 @@ var main = function(w, d){
             var $ = (function(){try{return cwin.$}catch(e){return null}})();
             if (!$) {
                 setTimeout(check, INTV_CHECK_MS);
+                log_debug('loading jQuery ...');
                 return;
             }
             if (!remove) {
@@ -618,6 +619,7 @@ var main = function(w, d){
                 ].join(','));
                 if (jq_items.size()<=0) {
                     jq_items = null;
+                    log_debug('item not found');
                     return;
                 }
             }
@@ -661,6 +663,8 @@ var main = function(w, d){
                     }
                     var jq_last_tweet = jq_items.find('.js-stream-item[data-item-id]:last');
                     if (0 < jq_last_tweet.size()) {
+                        //log_debug(jq_last_tweet.html());
+                        log_debug('last tweet: data-item-id: ' + jq_last_tweet.attr('data-item-id') + ' top: ' + jq_last_tweet.offset().top);
                         $(animate_tgt).animate({scrollTop: jq_last_tweet.offset().top}, animate_speed);
                     }
                     if ($('div.stream-end').is(':visible')) {
@@ -673,10 +677,15 @@ var main = function(w, d){
                                     jq_tweet_li_target_clone.css('background-color', target_color);
                                 }catch(e){}
                             }
+                            log_debug('stream-end found: retry over');
                             return;
                         }
                     }
+                    else {
+                        wait_cnt = MAX_CHECK_RETRY;
+                    }
                     setTimeout(check, INTV_CHECK_MS);
+                    log_debug('stream-end found: remaining count = ' + wait_cnt);
                     return;
                 }
                 target_color = VICINITY_TWEET_COLOR;
@@ -709,7 +718,9 @@ var main = function(w, d){
             $(animate_tgt).animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, animate_speed);
             setTimeout(function(){
                 $(animate_tgt).animate({scrollTop: jq_tweet_li.offset().top - $(cwin).height() / 2}, animate_speed);
+                // ※タイムラインが表示しきれておらず目的ツイートを真ん中にもってこれなかった場合等のために時間をずらして再度スクロール
             }, INTV_CHECK_MS);
+            log_debug('target tweet was found');
             return;
         };  //  end of check()
         check();
