@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.11
+// @version         0.2.3.12
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -556,6 +556,7 @@ var main = function(w, d){
         if (!target_color) target_color = TARGET_TWEET_COLOR;
         
         var wait_cnt = MAX_CHECK_RETRY, last_tweet_id = null, jq_items = null;
+        
         var giveup_tid = setInterval(function(){
             if (!jq_items) return;
             var jq_last_tweet = jq_items.find('.js-stream-item[data-item-id]:last');
@@ -933,19 +934,11 @@ var main = function(w, d){
         log_debug('max_id_from_url:'+max_id_from_url);
         
         var container_selector = container_selector_list.join(',');
-        $(d).bind('DOMNodeInserted', function(e){
-            if (current_url != w.location.href) {
-                current_url = w.location.href;
-                src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
-                max_tweet_id = BigNum(src_tweet_id);
-                max_id_from_url = (current_url.match(/(?:#|&|\?)max_(?:id|position)=(\d+)/)) ? RegExp.$1 : 0;
-                log_debug('*** URL changed');
-                log_debug('src_tweet_id:'+src_tweet_id);
-                log_debug('max_tweet_id:'+max_tweet_id);
-                log_debug('max_id_from_url:'+max_id_from_url);
-            }
-            var flg_hit = false;
-            var jq_target = $(e.target);
+        
+        var check_inserted_node = function(target_node){
+            var flg_hit = false,
+                jq_target = $(target_node);
+            
             ((jq_target.hasClass('js-stream-tweet')||jq_target.hasClass('tweet'))?jq_target:jq_target.find('div.js-stream-tweet,div.tweet')).each(function(){
                 var jq_tweet = $(this);
                 if (jq_tweet.parents(container_selector).size() <= 0) return;
@@ -995,7 +988,31 @@ var main = function(w, d){
                 jq_container.hide();
                 log_debug('* notice *: hide new tweets bar');
             });
-        });
+        };
+        
+        new MutationObserver(function(records){
+            log_debug('*** MutationObserver ***');
+            
+            if (current_url != w.location.href) {
+                current_url = w.location.href;
+                src_tweet_id = (current_url.match(/(?:#|&_)source_id=(\d+)/)) ? RegExp.$1 : 0;
+                max_tweet_id = BigNum(src_tweet_id);
+                max_id_from_url = (current_url.match(/(?:#|&|\?)max_(?:id|position)=(\d+)/)) ? RegExp.$1 : 0;
+                log_debug('*** URL changed');
+                log_debug('src_tweet_id:'+src_tweet_id);
+                log_debug('max_tweet_id:'+max_tweet_id);
+                log_debug('max_id_from_url:'+max_id_from_url);
+            }
+            
+            $.each(records, function(index, record) {
+                $.each(record.addedNodes, function(index, addedNode) {
+                    if (addedNode.nodeType != 1) {
+                        return;
+                    }
+                    check_inserted_node(addedNode);
+                });
+            });
+        }).observe(d.body, {childList: true, subtree: true});
         
         $(d).mouseover(function(e){
             var jq_target = $(e.target);
