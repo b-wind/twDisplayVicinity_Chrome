@@ -27,7 +27,7 @@
     "message": "特定ツイート後のタイムライン表示範囲(時間)"
   }
 , "DEFAULT_ACTION_ON_CLICK_EVENT" :{
-    "message": "クリック時のデフォルト動作（※[Shift]押下時は逆の動作になります）"
+    "message": "クリック時のデフォルト動作（※[Shift]押下時は逆の動作）"
   }
 , "SHOW_USER_TL": {
     "message": "ユーザータイムラインを表示（遡れるツイート数に制限あり）"
