@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.3.12
+// @version         0.2.3.13
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -470,6 +470,8 @@ var main = function(w, d){
             }
         }
         //search_url_list.push(API_SEARCH+'?q='+encodeURIComponent(query)+'&f=realtime'+source_hash);
+        //search_url_list.push(API_SEARCH + '?q='+encodeURIComponent(query) + '&f=tweets' + source_hash);
+        query += ' include:nativeretweets';
         search_url_list.push(API_SEARCH + '?q='+encodeURIComponent(query) + '&f=tweets' + source_hash);
         if (USE_SEARCH_TL_BY_DEFAULT && 2 <= search_url_list.length) {
             var url_search_shift = search_url_list[0];
@@ -633,13 +635,15 @@ var main = function(w, d){
             else {
                 var jq_tweet = null;
             }
+            var flg_retweet_exists = false;
             if (!jq_tweet || jq_tweet.size() < 1) {
                 jq_tweet = null;
                 if ($('.empty-text').is(':visible')) {
                     // https://～/with_replies で「@～さんはまだツイートしていません。」が表示される場合、https://twitter.com/search の方へ移動
                     if (url_search_tweets && url_search_tweets != url_search) {
                         setTimeout(function(){
-                            cwin.location.href = url_search_tweets;
+                            //cwin.location.href = url_search_tweets;
+                            cwin.location.replace( url_search_tweets + '&_replaced=1' );
                         }, 100);
                     }
                     log_debug('empty text');
@@ -693,12 +697,15 @@ var main = function(w, d){
                 log_debug('pattern-b:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
             }
             else {
-                if (jq_tweet.attr('data-retweet-id')==tweet_id) target_color = VICINITY_TWEET_COLOR;
+                if (jq_tweet.attr('data-retweet-id') == tweet_id) {
+                    flg_retweet_exists = true;
+                    target_color = VICINITY_TWEET_COLOR;
+                }
                 log_debug('pattern-a:'+tweet_id+' '+jq_tweet.attr('data-item-id'));
             }
             var jq_tweet_li = (jq_tweet.hasClass('js-stream-item')) ? jq_tweet : jq_tweet.parents('.js-stream-item');
             if (0 < jq_tweet_li.size()) {
-                if (jq_tweet_li_target) {
+                if ( ( jq_tweet_li_target ) && ( ! flg_retweet_exists ) ) {
                     var jq_tweet_li_target_clone = get_tweet_li_clone_for_cwin(jq_tweet_li_target);
                     try{
                         jq_tweet_li.before(jq_tweet_li_target_clone);
@@ -1064,7 +1071,7 @@ var main = function(w, d){
         if (src_tweet_id) (function(){
             var valid_parent = (function(){try{return w.opener.$}catch(e){return null}})();
             //if (valid_parent) return;
-            if (valid_parent && w.opener.$('form.search-404').size() <= 0 && w.history.length < 2) return;
+            if (valid_parent && w.opener.$('form.search-404').size() <= 0 && w.history.length < 2 && ( ! current_url.match(/(?:#|&_)replaced=1(?:#|&_|$)/) ) ) return;
             //  親windowにアクセスできない(親windowからコントロールできない)場合
             var jq_link = $('<a/>');
             jq_link.attr('href', current_url);
