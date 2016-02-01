@@ -37,7 +37,7 @@ twDisplayVicinity
 ■ 使い方
 ---
 下記の記事をご参照ください。  
-[【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作](http://d.hatena.ne.jp/furyu-tei/20140327/1395914958)
+[【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作](http://furyu.hatenablog.com/entry/20140327/1395914958)
 
 
 ■ Google Chrome 専用版（拡張機能）について
@@ -48,11 +48,11 @@ Google Chrome用には、[専用版（拡張機能）](https://chrome.google.com
 - オプション画面より、表示オプション等が設定可能
 
 詳細は、下記の記事をご参照ください。  
-[【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開](http://d.hatena.ne.jp/furyu-tei/20140609/twDisplayVicinity)
+[【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開](http://furyu.hatenablog.com/entry/20140609/twDisplayVicinity)
 
 
 ■ 関連記事
 ---
-- [【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20140327/1395914958)  
-- [【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20140609/twDisplayVicinity)
-- [Google ChromeへのTampermonkeyのインストールと基本的な使い方 - 風柳メモ](http://d.hatena.ne.jp/furyu-tei/20141227/1419609930)  
+- [【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト試作 - 風柳メモ](http://furyu.hatenablog.com/entry/20140327/1395914958)  
+- [【近傍ツイート検索】(twDisplayVicinity)：Google Chrome拡張機能版を公開 - 風柳メモ](http://furyu.hatenablog.com/entry/20140609/twDisplayVicinity)
+- [Google ChromeへのTampermonkeyのインストールと基本的な使い方 - 風柳メモ](http://furyu.hatenablog.com/entry/20141227/1419609930)  
