@@ -739,7 +739,7 @@ function main( w, d ) {
             ,   'background-size : 24px 12px'
             ].join( ';\n' ) + '}\n' + 
             'a.' + NAME_SCRIPT + '_image:hover {' + [
-                'background-position-x : -12px'
+                'background-position : -12px 0'
             ].join( ';\n' ) + '}\n'
         );
         
