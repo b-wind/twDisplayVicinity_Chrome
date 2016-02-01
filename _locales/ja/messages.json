@@ -45,13 +45,13 @@
     "message": "無効"
   }
 , "LINK_TEXT_HEADER": {
-    "message": "Link Text (標準)"
+    "message": "リンクテキスト (標準)"
   }
 , "ACT_LINK_TEXT_HEADER": {
-    "message": "Link Text (通知)"
+    "message": "リンクテキスト (通知)"
   }
 , "TS_LINK_TEXT_HEADER": {
-    "message": "Link Text (TwitSpritz)"
+    "message": "リンクテキスト (TwitSpritz)"
   }
 , "LINK_TEXT": {
     "message": "近傍"
@@ -61,5 +61,14 @@
   }
 , "TS_LINK_TEXT": {
     "message": "TwitSpritz"
+  }
+, "USE_LINK_ICON_HEADER" : {
+    "message": "リンクアイコン"
+  }
+, "ENABLED" : {
+    "message": "有効"
+  }
+, "DISABLED" : {
+    "message": "無効"
   }
 }

@@ -62,4 +62,13 @@
 , "TS_LINK_TEXT": {
     "message": "TwitSpritz"
   }
+, "USE_LINK_ICON_HEADER" : {
+    "message": "Link Icons"
+  }
+, "ENABLED" : {
+    "message": "enabled"
+  }
+, "DISABLED" : {
+    "message": "disabled"
+  }
 }

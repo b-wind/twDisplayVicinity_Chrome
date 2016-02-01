@@ -1,39 +1,103 @@
-(function(w,d){
-if (!w.location.href.match(/^https?:\/\/twitter\.com/)) return;
+( function ( w, d ) {
 
-w.twDisplayVicinity_Chrome = true;
+'use strict';
 
-var keys=[
-    'USE_SEARCH_TL_BY_DEFAULT'
-,   'FLG_TWITSPRITZ'
-,   'HOUR_AFTER'
-,   'LINK_TEXT'
-,   'ACT_LINK_TEXT'
-,   'TS_LINK_TEXT'
-];
-
-var escape_html = function(html){
-    var container = d.createElement('div');
-    container.appendChild(d.createTextNode(html));
-    return container.innerHTML;
-};  //  end of escape_html()
-
-var get_bool = function(val){
-    if (val === '0' || val === 0 || val === false || val === 'false') return false;
-    if (val === '1' || val === 1 || val === true || val === 'true') return true;
+function get_bool( value ) {
+    if ( value === undefined ) {
+        return null;
+    }
+    if ( ( value === '0' ) || ( value === 0 ) || ( value === false ) || ( value === 'false' ) ) {
+        return false;
+    }
+    if ( ( value === '1' ) || ( value === 1 ) || ( value === true ) || ( value === 'true' ) ) {
+        return true;
+    }
     return null;
-};  //  end of get_bool()
+}  // end of get_bool()
 
-chrome.extension.sendRequest({keys:keys}, function(rsp){
-    w.twDisplayVicinity_Options={
-        USE_SEARCH_TL_BY_DEFAULT : (rsp.USE_SEARCH_TL_BY_DEFAULT === undefined) ? null : get_bool(rsp.USE_SEARCH_TL_BY_DEFAULT)
-    //, FLG_TWITSPRITZ : (rsp.FLG_TWITSPRITZ === undefined) ? null : get_bool(rsp.FLG_TWITSPRITZ)
-    ,   FLG_TWITSPRITZ : null
-    ,   HOUR_AFTER : isNaN(rsp.HOUR_AFTER) ? null : parseInt(rsp.HOUR_AFTER)
-    ,   LINK_TEXT : (rsp.LINK_TEXT === undefined) ? null : escape_html(rsp.LINK_TEXT)
-    ,   ACT_LINK_TEXT : (rsp.ACT_LINK_TEXT === undefined) ? null : escape_html(rsp.ACT_LINK_TEXT)
-    ,   TS_LINK_TEXT : (rsp.TS_LINK_TEXT === undefined) ? null : escape_html(rsp.TS_LINK_TEXT)
-    };
-    //console.log(JSON.stringify(w.twDisplayVicinity_Options));
-});
-})(window,document);
+
+function get_int( value ) {
+    if ( isNaN( value ) ) {
+        return null;
+    }
+    return parseInt( value, 10 );
+} // end of get_int()
+
+
+function get_text( value ) {
+    if ( value === undefined ) {
+        return null;
+    }
+    return String( value );
+} // end of get_text()
+
+
+function get_init_function( message_type, option_name_to_function_map, namespace ) {
+    var option_names = [];
+    
+    for ( var option_name in option_name_to_function_map ) {
+        if ( option_name_to_function_map.hasOwnProperty( option_name ) ) {
+            option_names.push( option_name );
+        }
+    }
+    
+    function analyze_response( response ) {
+        var options = {};
+        
+        if ( ! response ) {
+            response = {};
+        }
+        
+        for ( var option_name in option_name_to_function_map ) {
+            if ( ! ( response.hasOwnProperty( option_name ) ) ) {
+                options[ option_name ] = null;
+                continue;
+            }
+            options[ option_name ] =  option_name_to_function_map[ option_name ]( response[ option_name ] );
+        }
+        return options;
+    }
+    
+    function init( callback ) {
+        // https://developer.chrome.com/extensions/runtime#method-sendMessage
+        chrome.runtime.sendMessage( {
+            type : message_type
+        ,   names : option_names
+        ,   namespace :  ( namespace ) ? namespace : ''
+        }, function ( response ) {
+            var options = analyze_response( response );
+            callback( options );
+        } );
+    }
+    
+    return init;
+} // end of get_init_function()
+
+
+var twDisplayVicinity_chrome_init = ( function() {
+    var option_name_to_function_map = {
+            USE_SEARCH_TL_BY_DEFAULT : get_bool
+        ,   HIDE_NEWER_TWEETS : get_bool
+        ,   USE_LINK_ICON : get_bool
+        ,   HOUR_BEFORE : get_int
+        ,   HOUR_AFTER : get_int
+        ,   DAY_BEFORE : get_int
+        ,   DAY_AFTER : get_int
+        ,   TARGET_TWEET_COLOR : get_text
+        ,   VICINITY_TWEET_COLOR : get_text
+        ,   LINK_COLOR : get_text
+        ,   ACT_LINK_COLOR : get_text
+        ,   LINK_TEXT : get_text
+        ,   LINK_TITLE : get_text
+        ,   ACT_LINK_TEXT : get_text
+        ,   ACT_LINK_TITLE : get_text
+        };
+    
+    return get_init_function( 'GET_OPTIONS', option_name_to_function_map );
+} )(); // end of twDisplayVicinity_chrome_init()
+
+w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
+
+} )( window, document );
+
+// ■ end of file

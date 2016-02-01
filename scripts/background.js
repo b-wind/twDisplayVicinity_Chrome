@@ -1,18 +1,45 @@
-(function(w,d){
-chrome.extension.onRequest.addListener(function(req,sender,sendResponse){
-	var	keys=req.keys,rsp={};
-	for (var ci=0,len=keys.length; ci<len; ci++) {
-		var	key=keys[ci];
-		rsp[key]=localStorage[key];
-	}
-	sendResponse(rsp);
-});
+( function ( w, d ) {
 
-chrome.extension.onConnect.addListener(function(port){
-	if (port.name=='open_in_tab') {
-		port.onMessage.addListener(function(message,con){
-			chrome.tabs.create({"url":message.url, "selected":(message.selected)?true:false});
-		});
-	}
-});
-})(window,document);
+// https://developer.chrome.com/extensions/runtime#event-onMessage
+chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
+    var type = message.type,
+        response = null;
+    
+    switch ( type ) {
+        case 'GET_OPTIONS':
+            var names = message.names,
+                namespace = message.namespace;
+            
+            response = {};
+            
+            if ( typeof name_list == 'string' ) {
+                names = [ names ];
+            }
+            
+            Array.apply( null, names ).forEach( function( name ) {
+                name = String( name );
+                response[ name ] = localStorage[ ( ( namespace ) ? ( String( namespace ) + '_' ) : '' ) + name ];
+            } );
+            break;
+        
+        default:
+            break;
+    }
+    
+    sendResponse( response );
+} );
+
+chrome.runtime.onConnect.addListener( function ( port ) {
+    if ( port.name == 'open_in_tab' ) {
+        port.onMessage.addListener( function ( message, con ) {
+            chrome.tabs.create( {
+                url : message.url
+            ,   selected : ( message.selected ) ? true : false
+            } );
+        } );
+    }
+} );
+
+} )( window, document );
+
+// ■ end of file
