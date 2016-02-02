@@ -66,16 +66,21 @@ $( function () {
             jq_target = $( '#' + key ),
             jq_inputs = jq_target.find( 'input:radio' );
         
-        jq_inputs.each( function () {
+        jq_inputs.unbind( 'change' ).each( function () {
             var jq_input = $( this ),
                 val=jq_input.val();
             
             if ( val === svalue ) {
-                jq_input.attr( 'checked', 'checked' );
+                //jq_input.attr( 'checked', 'checked' );
+                jq_input.prop( 'checked', 'checked' );
             }
-        } );
-        
-        jq_inputs.unbind( 'change' ).change( function () {
+            else {
+                //jq_input.attr( 'checked', false );
+                jq_input.prop( 'checked', false );
+            }
+            // ※ .attr() で変更した場合、ラジオボタンが書き換わらない場合がある(手動変更後に[デフォルトに戻す]を行った場合等)ので、.prop() を使用すること。
+            //   参考：[jQueryでチェックボックスの全チェック／外しをしようとしてハマッたこと、attr()とprop()の違いは罠レベル | Ultraひみちゅぶろぐ](http://ultrah.zura.org/?p=4450)
+        } ).change( function () {
             var jq_input = $( this );
             
             localStorage[ key ] = check_svalue( kv, jq_input.val() );
