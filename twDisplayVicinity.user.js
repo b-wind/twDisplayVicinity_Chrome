@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.1
+// @version         0.2.4.2
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -700,7 +700,7 @@ function main( w, d ) {
         // jq_link.attr( 'onclick', 'javascript:return ' + NAME_SCRIPT + '_click_link' + '( this, window.event || event )' );
         // → [2015.03.20] CSP設定変更により、onclick 属性への設定ができなくなった
         //jq_link.attr( 'target', '_blank' );   //  CSPによるonclick(インラインイベントハンドラ)使用禁止対策
-        // → document の mouseover イベントを開始、onclick イベントが LINK_DICT に登録されている場合には、イベントを再設定するように修正
+        // → document の mouseover イベントを監視し、onclick イベントが LINK_DICT に登録されている場合には、イベントを再設定するように修正
         
     } // end of set_link_to_click()
     
@@ -861,41 +861,43 @@ function main( w, d ) {
                 return;
             }
             
-            if ( ! remove ) {
-                //  突然タイムラインの特定のツイート(div.Grid要素)が削除され、それ以降のツイートが表示されなくなる不具合あり。(2014/06/08現在)
-                //  本スクリプトを無効化しても再現するため、おそらくTwitter側の問題。
-                //  → div.Grid要素のみ、削除されないよう暫定的にパッチ。
-                remove = $.prototype.remove;
-                $.prototype.remove = function (){
-                    var className = this.attr ? this.attr( 'class' ) : null;
-                    log_debug( '* notice *: remove element class=' + className );
-                    if ( is_child_url( cwin.location.href )  && className && ( ' ' + className + ' ').match( / Grid / ) ) {
-                        log_debug( ' => ignored' );
-                        return this;
-                    }
-                    return remove.apply( this, arguments );
-                }; // end of $.prototype.remove()
-                
-                // タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合あり。(2014/06/10現在)
-                // → Twitter 側のスクリプトから移動させないように暫定対策。
-                scrollTo = cwin.scrollTo;
-                cwin.scrollTo = function () {
-                    if ( is_child_url( cwin.location.href ) ) {
-                        log_debug( '* notice *: scrollTo() ignored' );
-                        return;
-                    }
-                    return scrollTo.apply( this, arguments );
-                };  //  end of cwin.scrollTo()
-                
-                scrollTop = $.prototype.scrollTop;
-                $.prototype.scrollTop = function (){
-                    if ( is_child_url( cwin.location.href ) && ( 0 < arguments.length ) ) {
-                        log_debug( '* notice *: scrollTop() ignored' );
-                        return this;
-                    }
-                    return scrollTop.apply( this, arguments );
-                };  //  end of $.prototype.scrollTop()
-            }
+            /* [2016/02/14] 暫定パッチを有効にしたままだと不具合発生（別のツイートへの返信が表示される等）→無効化して様子見
+            //if ( ! remove ) {
+            //    //  突然タイムラインの特定のツイート(div.Grid要素)が削除され、それ以降のツイートが表示されなくなる不具合あり。(2014/06/08現在)
+            //    //  本スクリプトを無効化しても再現するため、おそらくTwitter側の問題。
+            //    //  → div.Grid要素のみ、削除されないよう暫定的にパッチ。
+            //    remove = $.prototype.remove;
+            //    $.prototype.remove = function (){
+            //        var className = this.attr ? this.attr( 'class' ) : null;
+            //        log_debug( '* notice *: remove element class=' + className );
+            //        if ( is_child_url( cwin.location.href )  && className && ( ' ' + className + ' ').match( / Grid / ) ) {
+            //            log_debug( ' => ignored' );
+            //            return this;
+            //        }
+            //        return remove.apply( this, arguments );
+            //    }; // end of $.prototype.remove()
+            //    
+            //    // タイムライン閲覧中に意図しないタイミングでスクロールが発生する不具合あり。(2014/06/10現在)
+            //    // → Twitter 側のスクリプトから移動させないように暫定対策。
+            //    scrollTo = cwin.scrollTo;
+            //    cwin.scrollTo = function () {
+            //        if ( is_child_url( cwin.location.href ) ) {
+            //            log_debug( '* notice *: scrollTo() ignored' );
+            //            return;
+            //        }
+            //        return scrollTo.apply( this, arguments );
+            //    };  //  end of cwin.scrollTo()
+            //    
+            //    scrollTop = $.prototype.scrollTop;
+            //    $.prototype.scrollTop = function (){
+            //        if ( is_child_url( cwin.location.href ) && ( 0 < arguments.length ) ) {
+            //            log_debug( '* notice *: scrollTop() ignored' );
+            //            return this;
+            //        }
+            //        return scrollTop.apply( this, arguments );
+            //    };  //  end of $.prototype.scrollTop()
+            //}
+            */
             
             if ( ! jq_items ) {
                 jq_items = $( [
