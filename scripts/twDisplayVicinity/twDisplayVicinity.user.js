@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.2
+// @version         0.2.4.3
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -1445,7 +1445,6 @@ function main( w, d ) {
             
         } ).observe( d.body, { childList : true, subtree : true } );
         
-        
         $( d ).mouseover( function ( event ){
             // set_link_to_click() でセットした click イベントが、ツイートを「開く」→「閉じる」を実施すると無効化される(Twitter側のスクリプトの動作と思われる)
             // → mouseover イベント発火時に、click イベントを再設定することで対応
@@ -1462,9 +1461,7 @@ function main( w, d ) {
                     return false;
                 } );
             }
-            return false;
         } );
-        
         check_form404();
         
         check_uncontrolled_window();
