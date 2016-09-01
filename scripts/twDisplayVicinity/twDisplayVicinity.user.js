@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.3
+// @version         0.2.4.4
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -1179,7 +1179,7 @@ function main( w, d ) {
         
         log_debug( 'add_link_to_activity() time:' + time_sec + ' min:' + min_sec + ' max:' + max_sec );
         
-        jq_activity.find( 'ol.activity-supplement a.js-user-tipsy[data-user-id],a.js-action-profile-name' ).each( function () {
+        jq_activity.find( 'ol.activity-supplement a.js-profile-popup-actionable[data-user-id],a.js-action-profile-name' ).each( function () {
             var jq_user_link = $( this ),
                 screen_name = jq_user_link.attr( 'href' ).replace( /^.*\//, '' ),
                 url_search_list = get_search_url_list( null, screen_name, time_sec ),
@@ -1191,7 +1191,7 @@ function main( w, d ) {
                 tweet_search( jq_link, event, tweet_id, min_sec, null, OPTIONS.VICINITY_TWEET_COLOR, jq_activity );
                 return false;
             } );
-            if ( jq_user_link.hasClass( 'js-user-tipsy' ) && jq_link.hasClass( NAME_SCRIPT + '_image' ) ) {
+            if ( jq_user_link.hasClass( 'js-profile-popup-actionable' ) && jq_link.hasClass( NAME_SCRIPT + '_image' ) ) {
                 jq_user_link.find( 'img.avatar' ).css( {
                     'margin-right' : '0'
                 } );
