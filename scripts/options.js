@@ -19,10 +19,14 @@ $( function () {
     
     $( '.i18n' ).each( function () {
         var jq_elm = $( this ),
+            value = ( jq_elm.val() ) || ( jq_elm.html() ),
             text = chrome.i18n.getMessage( ( jq_elm.val() ) || ( jq_elm.html() ) );
         
         if ( ! text ) {
             return;
+        }
+        if ( ( value == 'OPTIONS' ) && ( jq_elm.parent().prop( 'tagName' ) == 'H1' ) ) {
+            text += ' version ' + chrome.app.getDetails().version + '';
         }
         if ( jq_elm.val() ) {
             jq_elm.val( text );

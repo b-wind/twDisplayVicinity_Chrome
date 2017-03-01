@@ -33,7 +33,7 @@
     "message": "Show User-Timeline (there are limits to the number of tweets)"
   }
 , "SHOW_SEARCH_TL": {
-    "message": "Show Search-Timeline (exclude retweets)"
+    "message": "Show Search-Timeline"
   }
 , "TWITSPRITZ": {
     "message": "TwitSpritz: show tweet like \"Spritz\" (mainly for Japanese sentence)"
