@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.4
+// @version         0.2.4.5
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -1179,7 +1179,7 @@ function main( w, d ) {
         
         log_debug( 'add_link_to_activity() time:' + time_sec + ' min:' + min_sec + ' max:' + max_sec );
         
-        jq_activity.find( 'ol.activity-supplement a.js-profile-popup-actionable[data-user-id],a.js-action-profile-name' ).each( function () {
+        jq_activity.find( 'a.js-user-profile-link[data-user-id],a.js-profile-popup-actionable' ).each( function () {
             var jq_user_link = $( this ),
                 screen_name = jq_user_link.attr( 'href' ).replace( /^.*\//, '' ),
                 url_search_list = get_search_url_list( null, screen_name, time_sec ),
