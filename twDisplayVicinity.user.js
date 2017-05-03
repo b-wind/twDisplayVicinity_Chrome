@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.5
+// @version         0.2.4.6
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -110,7 +110,7 @@ function main( w, d ) {
     w[ NAME_SCRIPT + '_touched' ] = true;
     
     var jq_script = $( 'script[src*="//abs.twimg.com/"][src*="/init."]:first' );
-    if ( 0 < jq_script.size() ) {
+    if ( 0 < jq_script.length ) {
         localStorage[ NAME_SCRIPT + '_jq_src' ] = jq_script.attr( 'src' );
     }
     //} end of check environment
@@ -164,7 +164,7 @@ function main( w, d ) {
         
         INTV_CHECK_MS = 300, // チェック間隔(単位：ms)
         MAX_CHECK_RETRY = 10, // 'div.stream-end' 要素が表示されてから、チェックを終了するまでのリトライ回数(タイミングにより、いったん表示されてもまた消える場合がある)
-        WAIT_BEFORE_GIVEUP_SCROLL_SEC = 10, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
+        WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
         
         ID_INC_PER_SEC = 1000 * ( 0x01 << 22 ),
         SEC_BEFORE = OPTIONS.HOUR_BEFORE * 3600,
@@ -811,7 +811,7 @@ function main( w, d ) {
             scrollTo = null,
             scrollTop = null,
             
-            animate_tgt = ( $.browser.webkit ) ? 'body' : 'html',
+            animate_tgt = ( w.navigator.userAgent.toLowerCase().indexOf('webkit') != -1 ) ? 'body' : 'html',
             animate_speed = 'fast'; //  'slow', 'normal', 'fast' またはミリ秒単位の数値
         
         if ( event && event.shiftKey && url_search_shift ) {
@@ -834,7 +834,7 @@ function main( w, d ) {
                 return;
             }
             var jq_last_tweet = jq_items.find( '.js-stream-item[data-item-id]:last' ),
-                tmp_tweet_id = ( 0 < jq_last_tweet.size() ) ? jq_last_tweet.attr( 'data-item-id' ) : null;
+                tmp_tweet_id = ( 0 < jq_last_tweet.length ) ? jq_last_tweet.attr( 'data-item-id' ) : null;
             
             if ( tmp_tweet_id == last_tweet_id ) {
                 clearInterval( giveup_tid );
@@ -905,7 +905,7 @@ function main( w, d ) {
                 ,   'ol.stream-items'
                 ].join( ',' ) );
                 
-                if ( jq_items.size() <= 0 ) {
+                if ( jq_items.length <= 0 ) {
                     jq_items = null;
                     log_debug( 'item not found' );
                     return;
@@ -923,7 +923,7 @@ function main( w, d ) {
             
             var flg_retweet_exists = false;
             
-            if ( ( ! jq_tweet ) || ( jq_tweet.size() < 1 ) ) {
+            if ( ( ! jq_tweet ) || ( jq_tweet.length < 1 ) ) {
                 jq_tweet = null;
                 
                 if ( $( '.empty-text' ).is( ':visible' ) ) {
@@ -960,7 +960,7 @@ function main( w, d ) {
                     
                     var jq_last_tweet = jq_items.find( '.js-stream-item[data-item-id]:last' );
                     
-                    if ( 0 < jq_last_tweet.size() ) {
+                    if ( 0 < jq_last_tweet.length ) {
                         log_debug( 'last tweet: data-item-id: ' + jq_last_tweet.attr( 'data-item-id' ) + ' top: ' + jq_last_tweet.offset().top );
                         $( animate_tgt ).animate( { scrollTop : jq_last_tweet.offset().top }, animate_speed );
                     }
@@ -1001,7 +1001,7 @@ function main( w, d ) {
             
             var jq_tweet_li = ( jq_tweet.hasClass( 'js-stream-item' ) ) ? jq_tweet : jq_tweet.parents( '.js-stream-item' );
             
-            if ( 0 < jq_tweet_li.size() ) {
+            if ( 0 < jq_tweet_li.length ) {
                 if ( ( jq_tweet_li_target ) && ( ! flg_retweet_exists ) ) {
                     var jq_tweet_li_target_clone = get_tweet_li_clone_for_cwin( jq_tweet_li_target );
                     try {
@@ -1018,7 +1018,7 @@ function main( w, d ) {
             
             var jq_tweet_li_innter = jq_tweet_li.find( 'div.js-tweet' );
             
-            if ( 0 < jq_tweet_li_innter.size() ) {
+            if ( 0 < jq_tweet_li_innter.length ) {
                 jq_tweet_li_innter.css( 'background-color', target_color );
             }
             else {
@@ -1047,7 +1047,7 @@ function main( w, d ) {
     function add_container_to_tweet( jq_tweet, jq_link_container ) {
         var jq_insert_point = jq_tweet.find( 'a.ProfileTweet-timestamp' ).parent();
         
-        if ( jq_insert_point.size() <= 0 ) {
+        if ( jq_insert_point.length <= 0 ) {
             jq_insert_point = jq_tweet.find( 'small.time:first' );
         }
         jq_insert_point.after( jq_link_container );
@@ -1067,7 +1067,7 @@ function main( w, d ) {
             jq_rtlink_container = result.container,
             jq_rtlink = result.link,
             jq_append_point = jq_tweet.find( 'div.ProfileTweet-context:first' ),
-            flg_enable_insert = ( 0 < jq_append_point.size() ) ? false : true;
+            flg_enable_insert = ( 0 < jq_append_point.length ) ? false : true;
         
         if ( id_range ) {
             set_link_to_click( jq_rtlink, function ( link, event ) {
@@ -1122,7 +1122,7 @@ function main( w, d ) {
                 return false;
             });
         }
-        if ( jq_append_point.size() <= 0 ) {
+        if ( jq_append_point.length <= 0 ) {
             jq_append_point = jq_tweet.find( 'div.context:first' ).find( 'div.with-icn:first' );
         }
         jq_append_point.append( jq_rtlink_container );
@@ -1134,7 +1134,7 @@ function main( w, d ) {
         
         var jq_container = jq_tweet.find( 'small.' + LINK_CONTAINER_CLASS );
         
-        if ( 0 < jq_container.size() ) {
+        if ( 0 < jq_container.length ) {
             return;
         }
         var tweet_id = jq_tweet.attr( 'data-item-id' ),
@@ -1164,15 +1164,15 @@ function main( w, d ) {
     
     
     function add_link_to_activity( jq_activity ) {
-        if ( 0 < jq_activity.find( 'small.' + ACT_CONTAINER_CLASS ).size() ) {
+        if ( 0 < jq_activity.find( 'small.' + ACT_CONTAINER_CLASS ).length ) {
             return;
         }
         var jq_timestamp = jq_activity.find( 'div.activity-timestamp span[data-time]:first' );
-        if ( jq_timestamp.size() < 1 ) {
+        if ( jq_timestamp.length < 1 ) {
             return;
         }
         var jq_tweet = jq_activity.find( 'div.tweet:first' ),
-            tweet_id = ( 0 < jq_tweet.size() ) ? jq_tweet.attr( 'data-item-id' ) : null,
+            tweet_id = ( 0 < jq_tweet.length ) ? jq_tweet.attr( 'data-item-id' ) : null,
             time_sec = parseInt( jq_timestamp.attr( 'data-time' ) ),
             min_sec = parseInt( jq_activity.attr( 'data-activity-min-position' ) ) / 1000,
             max_sec = parseInt( jq_activity.attr( 'data-activity-max-position' ) ) / 1000;
@@ -1267,7 +1267,7 @@ function main( w, d ) {
             ( ( jq_target.hasClass( 'js-stream-tweet' ) || jq_target.hasClass( 'tweet' ) ) ? jq_target : jq_target.find( 'div.js-stream-tweet,div.tweet' ) ).each( function () {
                 var jq_tweet = $( this );
                 
-                if ( jq_tweet.parents( container_selector ).size() <= 0 ) {
+                if ( jq_tweet.parents( container_selector ).length <= 0 ) {
                     return;
                 }
                 add_link_to_tweet( jq_tweet );
@@ -1282,7 +1282,7 @@ function main( w, d ) {
                 jq_tweet.parents( 'div.StreamItem:first,div.Grid:first,li:first' ).each( function () {
                     var jq_container_tmp = $( this );
                     
-                    if ( 0 < jq_container_tmp.parent( container_selector ).size() ) {
+                    if ( 0 < jq_container_tmp.parent( container_selector ).length ) {
                         jq_container = jq_container_tmp;
                         return false;
                     }
@@ -1313,7 +1313,7 @@ function main( w, d ) {
                 var jq_new_bar = $( this ),
                     jq_container = jq_new_bar.parent( 'div.stream-item' );
                 
-                if ( jq_container.size() <= 0 ) {
+                if ( jq_container.length <= 0 ) {
                     return;
                 }
                 jq_new_bar.hide();
@@ -1328,7 +1328,7 @@ function main( w, d ) {
         function check_form404() {
             var jq_form404 = $( 'form.search-404' );
             
-            if ( jq_form404.size() < 1 ) {
+            if ( jq_form404.length < 1 ) {
                 return false;
             }
             if ( ! current_url.match( /\/([^/]+)\/status(?:es)?\/(\d+)/ ) ) {
@@ -1401,7 +1401,7 @@ function main( w, d ) {
             
             if (
                 ( valid_parent ) &&
-                ( w.opener.$( 'form.search-404' ).size() <= 0 ) &&
+                ( w.opener.$( 'form.search-404' ).length <= 0 ) &&
                 ( w.history.length < 2 ) &&
                 ( ! current_url.match( /(?:#|&_)replaced=1(?:#|&_|$)/ ) ) 
             ) {
