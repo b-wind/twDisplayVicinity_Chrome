@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.4.6
+// @version         0.2.4.7
 // @include         http://twitter.com/*
 // @include         https://twitter.com/*
 // @description     Display the vicinity of a particular tweet on Twitter.
@@ -622,6 +622,7 @@ function main( w, d ) {
         }
         query += ' include:nativeretweets';
         search_url_list.push( API_SEARCH + '?q=' + encodeURIComponent( query ) + '&f=tweets' + source_hash );
+        //search_url_list.push( API_SEARCH + '?q=' + encodeURIComponent( query ) + '&f=tweets&vertical=default' + source_hash );
         
         if ( OPTIONS.USE_SEARCH_TL_BY_DEFAULT && ( 2 <= search_url_list.length ) ) {
             var url_search_shift = search_url_list[ 0 ];
@@ -811,7 +812,13 @@ function main( w, d ) {
             scrollTo = null,
             scrollTop = null,
             
-            animate_tgt = ( w.navigator.userAgent.toLowerCase().indexOf('webkit') != -1 ) ? 'body' : 'html',
+            ua = w.navigator.userAgent.toLowerCase(),
+            //animate_tgt = ( ua.indexOf('webkit') != -1 ) ? 'body' : 'html',
+            animate_tgt = ( ( ( ! window.chrome ) && ua.indexOf('webkit') != -1 ) || ( ua.indexOf('opr') != -1 ) || ( ua.indexOf('edge') != -1 ) ) ? 'body' : 'html',
+            // [Javascript Chromeでページトップに戻る(scrollTop)が効かなくなってた件。 - かもメモ](http://chaika.hatenablog.com/entry/2017/09/22/090000)
+                // ※ 2017/10現在 ($.fn.jquery = 3.1.1)
+                //   'html'<= Firefox, Chrome, Vivaldi, IE
+                //   'body'<= Safari, Opera, Edge
             animate_speed = 'fast'; //  'slow', 'normal', 'fast' またはミリ秒単位の数値
         
         if ( event && event.shiftKey && url_search_shift ) {
@@ -1050,8 +1057,11 @@ function main( w, d ) {
         if ( jq_insert_point.length <= 0 ) {
             jq_insert_point = jq_tweet.find( 'small.time:first' );
         }
-        jq_insert_point.after( jq_link_container );
         jq_tweet.find( 'div.client-and-actions span.metadata:first' ).after( jq_link_container.clone( true ) );
+        if ( jq_insert_point.next().hasClass( 'follow-bar' ) ) {
+            jq_link_container.css( 'margin-right','12px' );
+        }
+        jq_insert_point.after( jq_link_container );
     } // end of add_container_to_tweet()
     
     
@@ -1509,6 +1519,9 @@ function initialize( user_options ) {
             }
             script.textContent = textcontent;
             container.appendChild( script );
+            // Chrome で nonce が取得できなくなった模様（2017/10現在・バージョン: 62.0.3202.62で確認）
+            // このため、Tampermonkey では CSP による制限からインラインスクリプトが実行できず、動作しなくなってしまった
+            // Refused to execute inline script because it violates the following Content Security Policy directive: ... 'unsafe-eval' ... 'nonce-...' ..., or a nonce ('nonce-...') is required to enable inline execution.
         };
     } )(); // end of add_content_script()
     
