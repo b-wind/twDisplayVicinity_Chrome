@@ -1521,7 +1521,7 @@ function initialize( user_options ) {
             container.appendChild( script );
             // Chrome で nonce が取得できなくなった模様（2017/10現在・バージョン: 62.0.3202.62で確認）
             // このため、Tampermonkey では CSP による制限からインラインスクリプトが実行できず、動作しなくなってしまった
-            // Refused to execute inline script because it violates the following Content Security Policy directive: ... 'unsafe-eval' ... 'nonce-...' ..., or a nonce ('nonce-...') is required to enable inline execution.
+            // Refused to execute inline script because it violates the following Content Security Policy directive: ... 'unsafe-eval' ... 'nonce-...' .... Either the 'unsafe-inline' keyword, a hash ('sha256-...'), or a nonce ('nonce-...') is required to enable inline execution.
         };
     } )(); // end of add_content_script()
     
