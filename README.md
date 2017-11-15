@@ -3,7 +3,7 @@ twDisplayVicinity
 【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト  
 - License: The MIT license  
 - Copyright (c) 2014 風柳(furyu)  
-- 対象ブラウザ： Firefox（[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)が必要）~~、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）~~(2017/10現在、Chrome+Tampermonkeyの組み合わせだと動作しなくなっている。Edge/Opera/Vivaldi+Tampermonkeyならば動作するかも？)  
+- 対象ブラウザ： Firefox（<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)が必要）、<s>Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）</s>(2017/10現在、Chrome+Tampermonkeyの組み合わせだと動作しなくなっている。Edge/Opera/Vivaldi+Tampermonkeyならば動作するかも？)  
 
 
 ■ 近傍ツイート検索（twDisplayVicinity）とは？
@@ -27,12 +27,12 @@ twDisplayVicinity
 
 ■ インストール方法
 ---
-[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)を入れたFirefox~~、もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chrome~~にて、  
+<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)を入れたFirefox、<s>もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chrome</s>にて、  
 
 > [twDisplayVicinity.user.js](https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js)  
 
 をクリックし、指示に従ってインストール。  
-
+※ Firefox では Quantum(57) + Greasemonkey 4 より動作しなくなった（代わりに Tampermonkey を使用すること）。  
 
 ■ 使い方
 ---
