@@ -3,7 +3,7 @@ twDisplayVicinity
 【近傍ツイート検索】特定ツイート前後のタイムラインを表示するユーザースクリプト  
 - License: The MIT license  
 - Copyright (c) 2014 風柳(furyu)  
-- 対象ブラウザ： Firefox（<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)が必要）、<s>Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）</s>(2017/10現在、Chrome+Tampermonkeyの組み合わせだと動作しなくなっている。Edge/Opera/Vivaldi+Tampermonkeyならば動作するかも？)  
+- 対象ブラウザ： Firefox（<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)が必要）、Google Chrome（[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)が必要）  
 
 
 ■ 近傍ツイート検索（twDisplayVicinity）とは？
@@ -27,7 +27,7 @@ twDisplayVicinity
 
 ■ インストール方法
 ---
-<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)を入れたFirefox、<s>もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chrome</s>にて、  
+<s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)を入れたFirefox、もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chrome にて、  
 
 > [twDisplayVicinity.user.js](https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js)  
 
@@ -43,8 +43,9 @@ twDisplayVicinity
 ■ Google Chrome 専用版（拡張機能）について
 ---
 Google Chrome用には、[専用版（拡張機能）](https://chrome.google.com/webstore/detail/twdisplayvicinity/anmfeeanmnmdkjlhojpodibignbcfgjm)があります。  
+また、Firefox Quantum用には、[専用アドオン（WebExtensions）](https://addons.mozilla.org/ja/firefox/addon/twdisplayvicinity/)があります。  
 
-- 一度インストールしておけば、更新（バージョンアップ）はChrome側で自動で実施
+- 一度インストールしておけば、更新（バージョンアップ）は Chrome / Firefox 側で自動で実施
 - オプション画面より、表示オプション等が設定可能
 
 詳細は、下記の記事をご参照ください。  

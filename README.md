@@ -7,13 +7,15 @@ twDisplayVicinity_Chrome
 
 ■ これはなに？
 ---
-[近傍ツイート検索（twDisplayVicinity）](https://github.com/furyutei/twDisplayVicinity) の、[Google Chrome拡張版](https://chrome.google.com/webstore/detail/twdisplayvicinity/anmfeeanmnmdkjlhojpodibignbcfgjm)(ソースコード)です。  
+[近傍ツイート検索（twDisplayVicinity）というユーザースクリプト](https://github.com/furyutei/twDisplayVicinity) の、[Google Chrome拡張版](https://chrome.google.com/webstore/detail/twdisplayvicinity/anmfeeanmnmdkjlhojpodibignbcfgjm)／[Firefox Quantumアドオン版](https://addons.mozilla.org/ja/firefox/addon/twdisplayvicinity/)(ソースコード)です。  
 
 
 ■ インストール方法
 ---
+Google Chrome の場合、  
 [twDisplayVicinity - Chrome ウェブストア](https://chrome.google.com/webstore/detail/twdisplayvicinity/anmfeeanmnmdkjlhojpodibignbcfgjm)よりインストールして下さい。  
-
+また、Firefox Quantum の場合、
+[近傍ツイート検索 (twDisplayVicinity) :: Firefox 向けアドオン](https://addons.mozilla.org/ja/firefox/addon/twdisplayvicinity/)よりインストールして下さい。  
 
 ■ 使い方
 ---
