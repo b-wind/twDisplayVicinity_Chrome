@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.5.1
+// @version         0.2.5.2
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -57,6 +57,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+
 ( function ( w, d ) {
 
 'use strict';
@@ -76,8 +77,10 @@ var OPTIONS = {
     
     TARGET_TWEET_COLOR : 'gold', // 対象ツイートの色
     VICINITY_TWEET_COLOR : 'pink', // 近傍ツイートの色
-    LINK_COLOR : 'darkblue', // 近傍リンクの色
-    ACT_LINK_COLOR : 'indigo', // 通知リンクの色
+    //LINK_COLOR : 'darkblue', // 近傍リンクの色
+    LINK_COLOR : 'inherit', // 近傍リンクの色
+    //ACT_LINK_COLOR : 'indigo', // 通知リンクの色
+    ACT_LINK_COLOR : 'inherit', // 通知リンクの色
     
     HIDE_NEWER_TWEETS : true, // true: 最新のツイート(追加されたもの)を非表示
     USE_LINK_ICON : true, // 近傍リンクの種類（true: アイコンを使用 ／ false: 文字を使用
@@ -127,7 +130,11 @@ var $ = jQuery,
             return true;
         }
         return false;
-    } )();
+    } )(),
+    
+    IS_WEB_EXTENSION = !! ( w.is_web_extension ),
+    IS_FIREFOX = ( 0 <= w.navigator.userAgent.toLowerCase().indexOf( 'firefox' ) ),
+    IS_EDGE = ( 0 <= w.navigator.userAgent.toLowerCase().indexOf( 'edge' ) );
 
 //} end of check environment
 
@@ -138,12 +145,14 @@ switch ( LANGUAGE ) {
         OPTIONS.LINK_TITLE = '近傍ツイート表示';
         OPTIONS.ACT_LINK_TEXT = '近傍';
         OPTIONS.ACT_LINK_TITLE = 'アクションの近傍ツイート表示';
+        OPTIONS.GO_TO_PAST_TEXT = '以前のツイート↓';
         break;
     default:
         OPTIONS.LINK_TEXT = 'vicinity';
         OPTIONS.LINK_TITLE = 'search vicinity tweets';
         OPTIONS.ACT_LINK_TEXT = 'vicinity';
         OPTIONS.ACT_LINK_TITLE = 'search vicinity tweets around action';
+        OPTIONS.GO_TO_PAST_TEXT = 'Go to past ↓';
         break;
 }
 
@@ -465,6 +474,19 @@ function get_tweet_id_range( search_tweet_id, search_time_sec, reacted_tweet_id 
 } // end of get_tweet_id_range()
 
 
+function get_screen_name_from_url( url ) {
+    if ( ! url ) {
+        url = w.location.href;
+    }
+    
+    if ( ! url.match( /^(?:https?:\/\/[^\/]+)?\/([^\/]+)/ ) ) {
+        return null;
+    }
+    
+    return RegExp.$1;
+} // end of parse_individual_tweet_url()
+
+
 function parse_individual_tweet_url( tweet_url ) {
     if ( ! tweet_url ) {
         tweet_url = w.location.href;
@@ -639,11 +661,11 @@ var open_child_window = ( function () {
             }
             
             if ( child_window ) {
-                if ( child_window.location.href != url ) {
-                    child_window.location.href = url;
-                }
                 if ( child_window.name != name ) {
                     child_window.name = name;
+                }
+                if ( child_window.location.href != url ) {
+                    child_window.location.href = url;
                 }
             }
             else {
@@ -778,11 +800,26 @@ var get_jq_link_container = ( function () {
             if ( text ) {
                 jq_link.text( text );
             }
+            jq_link.css( {
+                opacity : '0.8'
+            } );
         }
         
         return { container : jq_link_container, link : jq_link };
     }; // end of get_jq_link_container()
 } )(); // end of get_jq_link_container()
+
+
+function get_search_timeline_url( search_url_list ) {
+    var filtered_url_list = search_url_list.filter( function ( search_url ) {
+            return ( search_url && ( search_url.indexOf( SEARCH_API, 0 ) == 0 ) );
+        } );
+    
+    if ( filtered_url_list.length <= 0 ) {
+        return null;
+    }
+    return filtered_url_list[ 0 ];
+} // end of get_search_timeline_url()
 
 
 function start_search_tweet() {
@@ -791,25 +828,17 @@ function start_search_tweet() {
     }
     
     var current_search_url = SEARCH_PARAMETERS.initial_search_url,
-        search_timeline_url = ( function () {
-            var filtered_url_list = SEARCH_PARAMETERS.search_url_list.filter( function ( search_url ) {
-                    return ( search_url && ( search_url.indexOf( SEARCH_API, 0 ) == 0 ) );
-                } );
-            
-            if ( filtered_url_list.length <= 0 ) {
-                return null;
-            }
-            return filtered_url_list[ 0 ];
-        } )(),
+        search_timeline_url = get_search_timeline_url( SEARCH_PARAMETERS.search_url_list ),
         
-        target_tweet_id = SEARCH_PARAMETERS.search_tweet_id || SEARCH_PARAMETERS.reacted_tweet_id || ( SEARCH_PARAMETERS.tweet_id_range && SEARCH_PARAMETERS.tweet_id_range.current_id ),
+        target_tweet_id = SEARCH_PARAMETERS.search_tweet_id || ( SEARCH_PARAMETERS.tweet_id_range && SEARCH_PARAMETERS.tweet_id_range.current_id ),
+        reacted_tweet_id = SEARCH_PARAMETERS.reacted_tweet_id,
         search_time_sec = SEARCH_PARAMETERS.search_time_sec,
         target_color = SEARCH_PARAMETERS.target_color,
         
         last_tweet_id = null,
         jq_timeline = null,
         giveup_tid = null,
-        wait_count = MAX_CHECK_RETRY,
+        wait_counter = MAX_CHECK_RETRY,
         
         ua = w.navigator.userAgent.toLowerCase(),
         animate_target_selector = ( ( ( ! w.chrome ) && ua.indexOf( 'webkit' ) != -1 ) || ( ua.indexOf( 'opr' ) != -1 ) || ( ua.indexOf( 'edge' ) != -1 ) ) ? 'body' : 'html',
@@ -859,11 +888,17 @@ function start_search_tweet() {
             ].join( ',' ) );
         }
         
+        if ( ( ( ! jq_target_tweet ) || ( jq_target_tweet.length <= 0 ) ) && ( reacted_tweet_id ) ) {
+            jq_target_tweet = jq_timeline.find( [
+                'div.js-stream-tweet[data-item-id="' + reacted_tweet_id + '"]:first'
+            ].join( ',' ) );
+        }
+        
         if ( ( jq_target_tweet ) && ( 0 < jq_target_tweet.length ) ) {
             // 目的ツイートが見つかった際の処理
             if ( jq_target_tweet.attr( 'data-retweet-id' ) == target_tweet_id ) {
                 retweet_found = true;
-                target_color = OPTIONS.VICINITY_TWEET_COLOR;
+                //target_color = OPTIONS.VICINITY_TWEET_COLOR;
             }
             log_debug( '*** Pattern A *** :', target_tweet_id, jq_target_tweet.attr( 'data-item-id' ) );
         }
@@ -875,7 +910,8 @@ function start_search_tweet() {
             if ( $( '.empty-text' ).is( ':visible' ) ) {
                 // https://～/with_replies で「@～さんはまだツイートしていません。」が表示される場合、https://twitter.com/search の方へ移動
                 if ( search_timeline_url && ( search_timeline_url != current_search_url ) ) {
-                    w.location.replace( search_timeline_url + '&_replaced=1' );
+                    //w.location.replace( search_timeline_url + '&_replaced=1' );
+                    w.location.replace( search_timeline_url );
                 }
                 log_debug( '*** empty-text was found ***' );
                 return;
@@ -933,18 +969,18 @@ function start_search_tweet() {
                 }
                 
                 if ( $( 'div.stream-end' ).is( ':visible' ) ) {
-                    wait_count --;
+                    wait_counter --;
                     
-                    if ( wait_count <= 0 ) {
+                    if ( wait_counter <= 0 ) {
                         // TODO: 旧版では元ツイートをコピーして挿入する処理が入っていたが、新版では仕組み上困難
                         
                         log_error( '*** stream-end found: retry over ***' );
                         return;
                     }
-                    log_debug( 'stream-end found: remaining count =', wait_count );
+                    log_debug( 'stream-end found: remaining count =', wait_counter );
                 }
                 else {
-                    wait_count = MAX_CHECK_RETRY;
+                    wait_counter = MAX_CHECK_RETRY;
                 }
                 
                 setTimeout( search_tweet, INTV_CHECK_MS );
@@ -1009,7 +1045,8 @@ function open_search_window( parameters ) {
         target_color = parameters.target_color,
         child_window = parameters.child_window,
         search_url = jq_link.attr( 'href' ),
-        search_url_shift = jq_link.attr( 'data-search-url-shift' );
+        search_url_shift = jq_link.attr( 'data-search-url-shift' ),
+        search_timeline_url = get_search_timeline_url( search_parameters.search_url_list );
     
     if ( event && ( event.shiftKey || event.altKey ) && search_url_shift ) {
         search_url = search_url_shift;
@@ -1023,9 +1060,74 @@ function open_search_window( parameters ) {
     
     search_parameters.target_color = target_color;
     
-    child_window = open_child_window( search_url, {
-        existing_window : child_window,
-        search_parameters : search_parameters
+    if ( search_url == search_timeline_url ) {
+        child_window = open_child_window( search_url, {
+            existing_window : child_window,
+            search_parameters : search_parameters
+        } );
+        
+        return child_window;
+    }
+    
+    var target_tweet_id = search_parameters.search_tweet_id || ( search_parameters.tweet_id_range && search_parameters.tweet_id_range.current_id ),
+        search_time_sec = search_parameters.search_time_sec,
+        max_position;
+    
+    if ( ! target_tweet_id ) {
+        target_tweet_id = get_tweet_id_from_utc_sec( search_time_sec );
+        
+        if ( ! target_tweet_id ) {
+            child_window = open_child_window( search_timeline_url, {
+                existing_window : child_window,
+                search_parameters : search_parameters
+            } );
+            
+            return child_window;
+        }
+    }
+    
+    // ユーザータイムラインを予め取得し、当該ツイート以前のツイートが無いようであれば、最初から https://twitter.com/search の方を開く
+    max_position = Decimal.add( target_tweet_id, 1 ).toString();
+    
+    if ( ! child_window ) {
+        //child_window = open_child_window( 'about:blank' );
+        // TODO: 非同期処理の中で window.open() を行うと、タブではなくウィンドウで開いてしまうという現象があったための対策だった
+        //   [Google Chromeでの window.open() の動作の違い - 風柳メモ](http://furyu.hatenablog.com/entry/20140330/1396162061)
+        //   しかし、Firefox だと、のちに href に入れようとしたところで
+        //   Permission denied to access property "href" on cross-origin object
+        //   のエラーが出てしまい、回避方法が不明
+        //   幸い、↑の対策がなくても、現在ではタブで開いてくれるようになっている模様 ( Chrome, Firefox共に)
+    }
+    
+    $.getJSON( [ 'https://twitter.com/i/profiles/show/', search_parameters.screen_name, '/timeline/with_replies' ].join( '' ), {
+        'include_available_features' : '1',
+        'include_entities' : '1',
+        'oldest_unread_id' : '0',
+        'reset_error_state' : 'false',
+        'max_position': max_position
+    } )
+    .success( function ( json ) {
+        try {
+            var tweet_number = $( '<div/>' ).html( json.items_html ).find( '.js-stream-item' ).length;
+            
+            if ( tweet_number <= 0 ) {
+                log_debug( '*** target tweet was not found in user-timeline, then open search-timeline ***', search_parameters.screen_name, target_tweet_id, tweet_number, json.has_more_items );
+                search_url = search_timeline_url;
+            }
+        }
+        catch( error ) {
+            log_error( '*** could not analyze json ***', error );
+        }
+    } )
+    .error( function ( jqXHR, textStatus, errorThrown ) {
+        log_error( '*** could not read timeline ***', textStatus );
+        search_url = search_timeline_url;
+    } )
+    .complete( function () {
+        child_window = open_child_window( search_url, {
+            existing_window : child_window,
+            search_parameters : search_parameters
+        } );
     } );
     
     return child_window;
@@ -1079,12 +1181,11 @@ function add_rtlink_to_tweet( jq_tweet, tweet_id ) {
         jq_append_point = jq_tweet.find( 'div.ProfileTweet-context:first' );
     
     set_click_handler( jq_rtlink, function ( link, event ) {
-        //tweet_search( jq_rtlink, event, retweet_id, null, null, OPTIONS.VICINITY_TWEET_COLOR, ( ( flag_enable_insert ) ? jq_tweet : null ) );
         open_search_window( {
             jq_link : jq_rtlink,
             event : event,
             search_parameters : search_parameters,
-            target_color : OPTIONS.VICINITY_TWEET_COLOR,
+            //target_color : OPTIONS.VICINITY_TWEET_COLOR,
             child_window : null
         } );
         
@@ -1099,6 +1200,56 @@ function add_rtlink_to_tweet( jq_tweet, tweet_id ) {
     jq_append_point.append( jq_rtlink_container );
     
 } // end of add_rtlink_to_tweet()
+
+
+function add_link_to_quote_tweet( jq_item ) {
+    var jq_quote_tweets = jq_item.find( 'div.QuoteTweet div.js-permalink[data-item-type="tweet"]');
+    
+    jq_quote_tweets.each( function () {
+        var jq_quote_tweet = $( this ),
+            jq_user_name = jq_quote_tweet.find( 'div.QuoteTweet-originalAuthor span.username' );
+        
+        if ( jq_user_name.length <= 0 ) {
+            return;
+        }
+        
+        var tweet_id = jq_quote_tweet.attr( 'data-item-id' ),
+            screen_name = jq_quote_tweet.attr( 'data-screen-name' ),
+            search_info = get_search_info( {
+                search_tweet_id : tweet_id,
+                reacted_tweet_id : null,
+                tweet_id_range : null,
+                screen_name : screen_name,
+                max_id : null
+            } ),
+            search_url_list = search_info.search_url_list,
+            search_parameters = search_info.search_parameters,
+            result = get_jq_link_container( search_url_list, {
+                class_name : LINK_CONTAINER_CLASS,
+                title : OPTIONS.LINK_TITLE,
+                text : OPTIONS.LINK_TEXT,
+                css : {
+                    'color' : OPTIONS.LINK_COLOR,
+                    'padding' : '4px'
+                }
+            } ),
+            jq_link_container = result.container,
+            jq_link = result.link;
+        
+        set_click_handler( jq_link, function ( link, event ) {
+            open_search_window( {
+                jq_link : jq_link,
+                event : event,
+                search_parameters : search_parameters,
+                child_window : null
+            } );
+            
+            return false;
+        } );
+        
+        jq_user_name.after( jq_link_container );
+    } );
+} // end of add_link_to_quote_tweet()
 
 
 function add_link_to_tweet( jq_tweet ) {
@@ -1130,12 +1281,11 @@ function add_link_to_tweet( jq_tweet ) {
         } ),
         jq_link_container = result.container,
         jq_link = result.link,
-        removed_count = jq_tweet.find( 'small.' + LINK_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応）
+        removed_number = jq_tweet.find( 'small.' + LINK_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応）
     
-    log_debug( 'add_link_to_tweet(): screen_name:', screen_name, ' tweet_id:', tweet_id, ' removed_count:', removed_count );
+    log_debug( 'add_link_to_tweet(): screen_name:', screen_name, ' tweet_id:', tweet_id, ' removed_number:', removed_number );
     
     set_click_handler( jq_link, function ( jq_link, event ) {
-        //tweet_search( jq_link, event, tweet_id, time_sec );
         open_search_window( {
             jq_link : jq_link,
             event : event,
@@ -1151,6 +1301,7 @@ function add_link_to_tweet( jq_tweet ) {
     
     add_rtlink_to_tweet( jq_tweet, tweet_id );
     
+    add_link_to_quote_tweet( jq_tweet );
 } // end of add_link_to_tweet()
 
 
@@ -1161,13 +1312,15 @@ function add_link_to_activity( jq_activity ) {
     }
     
     var jq_tweet = jq_activity.find( 'div.tweet:first' ),
-        tweet_id = ( 0 < jq_tweet.length ) ? jq_tweet.attr( 'data-item-id' ) : jq_activity.find( 'div.js-permalink[data-item-type="tweet"]:first').attr( 'data-item-id' ),
+        jq_quote_tweets = jq_activity.find( 'div.js-permalink[data-item-type="tweet"]'),
+        tweet_id = ( 0 < jq_tweet.length ) ? jq_tweet.attr( 'data-item-id' ) : jq_quote_tweets.attr( 'data-item-id' ),
+        // TO: 引用ツイートは複数ある場合有り（暫定的に一つだけ）
         time_sec = parseInt( jq_timestamp.attr( 'data-time' ) ),
         min_sec = parseInt( jq_activity.attr( 'data-activity-min-position' ) ) / 1000,
         max_sec = parseInt( jq_activity.attr( 'data-activity-max-position' ) ) / 1000,
-        removed_count = jq_activity.find( 'small.' + ACT_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応
+        removed_number = jq_activity.find( 'small.' + ACT_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応
     
-    log_debug( 'add_link_to_activity(): time:', time_sec, ' min:', min_sec, ' max:', max_sec, ' removed_count:', removed_count );
+    log_debug( 'add_link_to_activity(): time:', time_sec, ' min:', min_sec, ' max:', max_sec, ' removed_number:', removed_number );
     
     jq_activity.find( 'a.js-user-profile-link[data-user-id],a.js-profile-popup-actionable' )
     .each( function () {
@@ -1200,29 +1353,44 @@ function add_link_to_activity( jq_activity ) {
             jq_link = result.link;
         
         set_click_handler( jq_link, function ( link, event ) {
-            //tweet_search( jq_link, event, tweet_id, min_sec, null, OPTIONS.VICINITY_TWEET_COLOR, jq_activity );
             open_search_window( {
                 jq_link : jq_link,
                 event : event,
                 search_parameters : search_parameters,
-                target_color : OPTIONS.VICINITY_TWEET_COLOR,
+                //target_color : OPTIONS.VICINITY_TWEET_COLOR,
                 child_window : null
             } );
             
             return false;
         } );
         
-        if ( jq_user_link.hasClass( 'js-profile-popup-actionable' ) && jq_link.hasClass( SCRIPT_NAME + '_image' ) ) {
-            // アバターアイコンに挿入する際のマージン調整
-            jq_user_link.find( 'img.avatar' ).css( {
-                'margin-right' : '0'
-            } );
+        if ( jq_user_link.hasClass( 'js-profile-popup-actionable' ) ) {
+            if ( jq_link.hasClass( SCRIPT_NAME + '_image' ) ) {
+                // アバターアイコンに挿入する際のマージン調整
+                jq_user_link.find( 'img.avatar' ).css( {
+                    'margin-right' : '0'
+                } );
+            }
+            else {
+                jq_link_container.css( {
+                    'margin-left' : '2px'
+                } );
+            }
+        }
+        else {
+            if ( ! OPTIONS.USE_LINK_ICON ) {
+                jq_link_container.css( {
+                    'margin-left' : '2px',
+                    'margin-right' : '1px'
+                } );
+            }
         }
         jq_user_link.after( jq_link_container );
     } );
     
-} // end of add_link_to_activity()
+    add_link_to_quote_tweet( jq_activity );
 
+} // end of add_link_to_activity()
 
 function hide_newer_tweet( jq_tweet, threshold_tweet_id ) {
     if ( ! threshold_tweet_id ) {
@@ -1284,6 +1452,64 @@ function hide_newer_tweet_container( jq_target, threshold_tweet_id ) {
 } // end of hide_newer_tweet_container()
 
 
+function check_back_to_top( jq_target ) {
+    if ( $( '#timeline.ProfileTimeline' ).length <= 0 ) {
+        // ユーザータイムライン以外
+        return;
+    }
+    
+    function set_event( jq_go_to_past_button ) {
+        jq_go_to_past_button
+        .unbind( 'click' )
+        .click( function ( event ) {
+            var screen_name = get_screen_name_from_url(),
+                jq_last_tweet = $( 'ol.stream-items div.js-stream-tweet:last' );
+            
+            if ( ( ! screen_name ) || ( jq_last_tweet.length <= 0 ) ) {
+                jq_go_to_past_button.remove();
+                return false;
+            }
+            
+            var min_tweet_id = ( jq_last_tweet.attr( 'data-retweet-id' ) || jq_last_tweet.attr( 'data-tweet-id' ) ),
+                max_id = Decimal.sub( min_tweet_id, 1 ),
+                query = 'from:' + screen_name + ' max_id:' + max_id + ' include:nativeretweets',
+                search_url = SEARCH_API + '?q=' + encodeURIComponent( query ) + '&f=tweets';
+            
+            open_child_window( search_url );
+            
+            return false;
+        } );
+    } // end of set_event()
+    
+    var go_to_past_button_class = SCRIPT_NAME + '_go_to_past_timeline';
+    
+    ( ( jq_target.hasClass( 'back-to-top' ) ) ? jq_target : jq_target.find( 'button.back-to-top' ) )
+    .each( function () {
+        var jq_tmp_button = $( this );
+        
+        if ( jq_tmp_button.hasClass( go_to_past_button_class ) ) {
+            set_event( jq_tmp_button );
+            return false;
+        }
+        
+        if ( jq_tmp_button.parents( '.stream-footer' ).length <= 0 ) {
+            return;
+        }
+        
+        var jq_back_to_top_button = jq_tmp_button,
+            jq_go_to_past_button = jq_back_to_top_button.clone();
+        
+        jq_go_to_past_button.addClass( go_to_past_button_class ).css( 'margin-left', '24px' );
+        jq_go_to_past_button.text( OPTIONS.GO_TO_PAST_TEXT );
+        
+        set_event( jq_go_to_past_button );
+        
+        jq_back_to_top_button.after( jq_go_to_past_button );
+    } );
+
+} // end of check_back_to_top()
+
+
 function check_changed_node( target_node ) {
     if ( ( ! target_node ) || ( target_node.nodeType != 1 ) ) {
         return false;
@@ -1314,6 +1540,7 @@ function check_changed_node( target_node ) {
     
     hide_newer_tweet_container( jq_target, hide_threshold_tweet_id );
     
+    check_back_to_top( jq_target );
 } // end of check_changed_node()
 
 
@@ -1390,11 +1617,13 @@ function check_404_page() {
     
     jq_link_container.css( {
         'display' : 'inline-block',
-        'background-color' : 'lightyellow'
+        //'background-color' : 'lightyellow'
+        'background-color' : 'inherit'
     } );
     
     jq_link.css( {
-        'color' : '#0084b4',
+        //'color' : '#0084b4',
+        'color' : 'inherit',
         'font-size' : '16px',
         'font-weight' : 'bold'
     } );

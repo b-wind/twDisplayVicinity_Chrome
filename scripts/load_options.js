@@ -96,11 +96,13 @@ var twDisplayVicinity_chrome_init = ( function() {
         ,   LINK_TITLE : get_text
         ,   ACT_LINK_TEXT : get_text
         ,   ACT_LINK_TITLE : get_text
+        ,   GO_TO_PAST_TEXT : get_text
         };
     
     return get_init_function( 'GET_OPTIONS', option_name_to_function_map );
 } )(); // end of twDisplayVicinity_chrome_init()
 
+w.is_web_extension = true;
 w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
 
 } )( window, document );
