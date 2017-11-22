@@ -71,4 +71,10 @@
 , "DISABLED" : {
     "message": "disabled"
   }
+, "START" : {
+    "message" : "Start"
+  }
+, "STOP" : {
+    "message" : "Stop"
+  }
 }

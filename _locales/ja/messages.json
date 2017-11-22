@@ -71,4 +71,10 @@
 , "DISABLED" : {
     "message": "無効"
   }
+, "START" : {
+    "message" : "動作開始"
+  }
+, "STOP" : {
+    "message" : "動作停止"
+  }
 }

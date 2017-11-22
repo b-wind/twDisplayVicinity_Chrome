@@ -2,6 +2,9 @@
 
 'use strict';
 
+w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
+
+
 function get_bool( value ) {
     if ( value === undefined ) {
         return null;
@@ -76,9 +79,11 @@ function get_init_function( message_type, option_name_to_function_map, namespace
 
 var twDisplayVicinity_chrome_init = ( function() {
     var option_name_to_function_map = {
-            USE_SEARCH_TL_BY_DEFAULT : get_bool
+            OPERATION : get_bool
+        ,   USE_SEARCH_TL_BY_DEFAULT : get_bool
         ,   HIDE_NEWER_TWEETS : get_bool
         ,   USE_LINK_ICON : get_bool
+        ,   IGNORE_SINCE : get_bool
         ,   HOUR_BEFORE : get_int
         ,   HOUR_AFTER : get_int
         ,   DAY_BEFORE : get_int

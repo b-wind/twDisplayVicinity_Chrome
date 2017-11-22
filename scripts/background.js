@@ -1,5 +1,10 @@
 ( function ( w, d ) {
 
+'use strict';
+
+w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
+
+
 // https://developer.chrome.com/extensions/runtime#event-onMessage
 chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
     var type = message.type,

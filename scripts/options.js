@@ -1,5 +1,13 @@
 ( function( w, d ) {
 
+'use strict';
+
+w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
+
+
+var IS_EDGE = ( 0 <= w.navigator.userAgent.toLowerCase().indexOf( 'edge' ) );
+
+
 $( function () {
     var RADIO_KV_LIST = [
             { key : 'USE_SEARCH_TL_BY_DEFAULT', val : false }
@@ -11,6 +19,7 @@ $( function () {
         STR_KV_LIST = [
             { key : 'LINK_TEXT' }
         ,   { key : 'ACT_LINK_TEXT' }
+        ,   { key : 'BUTTON_TEXT' }
         ];
     
     STR_KV_LIST.forEach( function( str_kv ) {
@@ -26,7 +35,7 @@ $( function () {
             return;
         }
         if ( ( value == 'OPTIONS' ) && ( jq_elm.parent().prop( 'tagName' ) == 'H1' ) ) {
-            text += ' version ' + chrome.app.getDetails().version + '';
+            text += ' ( version ' + chrome.runtime.getManifest().version + ' )';
         }
         if ( jq_elm.val() ) {
             jq_elm.val( text );
@@ -159,6 +168,32 @@ $( function () {
     } // end of set_str_evt()
     
     
+    function set_operation_evt() {
+        var jq_operation = $( 'input[name="OPERATION"]' ),
+            operation = get_bool( localStorage[ 'OPERATION' ] ),
+            operation = ( operation === null ) ? true : operation; // デフォルトは true (動作中)
+        
+        function set_operation( next_operation ) {
+            var button_text = ( next_operation ) ? ( chrome.i18n.getMessage( 'STOP' ) ) : ( chrome.i18n.getMessage( 'START' ) ),
+                path_to_img = ( IS_EDGE ) ? 'images' : 'images', // TODO: MS-Edge の場合、options.html からの相対パスになっていない（manifest.jsonからの相対パス？）
+                icon_path = ( next_operation ) ? ( path_to_img + '/icon_16.png' ) : ( path_to_img + '/icon_16-gray.png' );
+            
+            jq_operation.val( button_text );
+            chrome.browserAction.setIcon( { path : icon_path } );
+            
+            localStorage[ 'OPERATION' ] = next_operation;
+            operation = next_operation;
+        }
+        
+        jq_operation.unbind( 'click' ).click( function( event ) {
+            set_operation( ! operation );
+            reset_context_menu();
+        } );
+        
+        set_operation( operation );
+    } // end of set_operation_evt()
+    
+    
     function set_all_evt() {
         RADIO_KV_LIST.forEach( function( radio_kv ) {
             set_radio_evt( radio_kv );
@@ -171,6 +206,8 @@ $( function () {
         STR_KV_LIST.forEach( function( str_kv ) {
             set_str_evt( str_kv );
         } );
+        
+        set_operation_evt();
     }   //  end of set_all_evt()
     
     

@@ -94,6 +94,7 @@ input.short_text {
 
 input.button {
     font-weight: bolder;
+    margin-right: 12px;
     cursor: pointer;
     border: solid 1px #7b8d42;
     border-radius: 2px;

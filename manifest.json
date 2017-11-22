@@ -2,9 +2,10 @@
     "manifest_version" : 2
 ,   "name" : "__MSG_ext_title__"
 ,   "short_name" : "__MSG_ext_short_name__"
-,   "version" : "0.2.4.700"
+,   "version" : "0.2.5.100"
 ,   "description" : "__MSG_ext_description__"
-,   "default_locale" : "ja"
+,   "author" : "furyu"
+,   "default_locale" : "en"
 ,   "icons" : {
         "16" : "images/icon_16.png"
     ,   "48" : "images/icon_48.png"
@@ -14,7 +15,7 @@
 ,   "content_scripts" : [
         {
             "matches" : [ "http://twitter.com/*", "https://twitter.com/*" ]
-        ,   "js" : [ "scripts/load_options.js" ]
+        ,   "js" : [ "scripts/jquery.min.js", "scripts/decimal.min.js", "scripts/load_options.js" ]
         ,   "run_at" : "document_start"
         }
     ,   {
@@ -27,7 +28,10 @@
         "scripts" : [ "scripts/background.js" ]
     ,   "persistent": false
     }
-,   "options_page" : "options.html"
+,   "options_ui" : {
+        "page" : "options.html"
+    ,   "open_in_tab" : true
+    }
 ,   "browser_action" : {
         "default_icon" : "images/icon_16.png"
     ,   "default_title" : "__MSG_ext_title__"
