@@ -2,7 +2,7 @@
     "manifest_version" : 2
 ,   "name" : "__MSG_ext_title__"
 ,   "short_name" : "__MSG_ext_short_name__"
-,   "version" : "0.2.5.200"
+,   "version" : "0.2.6.100"
 ,   "description" : "__MSG_ext_description__"
 ,   "author" : "furyu"
 ,   "default_locale" : "en"
@@ -37,4 +37,5 @@
     ,   "default_title" : "__MSG_ext_title__"
     ,   "default_popup" : "options.html"
     }
+,   "permissions": [ "*://*.twitter.com/*" ]
 }

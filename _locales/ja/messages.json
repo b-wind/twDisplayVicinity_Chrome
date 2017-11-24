@@ -1,6 +1,6 @@
 {
   "ext_title": {
-    "message": "近傍ツイート検索 (twDisplayVicinity)"
+    "message": "近傍ツイート検索"
   , "description": "The title of the extension."
   }
 , "ext_short_name": {
@@ -12,7 +12,7 @@
   , "description": "The description of the extension."
   }
 , "OPTIONS" : {
-    "message": "近傍ツイート検索 (twDisplayVicinity)"
+    "message": "近傍ツイート検索"
   }
 , "SET" : {
     "message": "設定"
@@ -64,6 +64,12 @@
   }
 , "USE_LINK_ICON_HEADER" : {
     "message": "リンクアイコン"
+  }
+, "ENABLE_RECENT_RETWEET_USERS_BUTTON_HEADER" : {
+    "message" : "最近リツイートしたユーザーを表示するボタン"
+  }
+, "MAX_USER_NUMBER_HEADER" : {
+    "message" : "取得ユーザー数 (最大:100)"
   }
 , "ENABLED" : {
     "message": "有効"

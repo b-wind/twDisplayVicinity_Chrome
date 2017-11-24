@@ -17,37 +17,50 @@
   <form id="form_opts">
     <h2 class="i18n">DEFAULT_ACTION_ON_CLICK_EVENT</h2>
     <div class="opt radio" id="USE_SEARCH_TL_BY_DEFAULT">
-      <p><input type="radio" value="0" name="USE_SEARCH_TL_BY_DEFAULT" id="USE_SEARCH_TL_BY_DEFAULT_0" /><label for="USE_SEARCH_TL_BY_DEFAULT_0" class="i18n">SHOW_USER_TL</label></p>
-      <p><input type="radio" value="1" name="USE_SEARCH_TL_BY_DEFAULT" id="USE_SEARCH_TL_BY_DEFAULT_1" /><label for="USE_SEARCH_TL_BY_DEFAULT_1" class="i18n">SHOW_SEARCH_TL</label></p>
-    <!-- /.select --></div>
+      <p><label><input type="radio" value="0" name="USE_SEARCH_TL_BY_DEFAULT" /><span class="i18n">SHOW_USER_TL</span></label></p>
+      <p><label><input type="radio" value="1" name="USE_SEARCH_TL_BY_DEFAULT" /><span class="i18n">SHOW_SEARCH_TL</span></label></p>
+    <!-- /.radio --></div>
     
     <h2 class="i18n">HOUR_AFTER</h2>
     <div class="opt int" id="HOUR_AFTER">
       <span class="current short_text"></span><span class="i18n">HOURS</span> =&gt;
       <input type="text" value="8" name="HOUR_AFTER" class="short_text" />
       <input type="button" value="SET" name="SET" class="i18n button" />
-    <!-- /.set --></div>
+    <!-- /.int --></div>
     
     <h2 class="i18n">LINK_TEXT_HEADER</h2>
     <div class="opt str" id="LINK_TEXT">
       <span class="current text"></span>=&gt;
       <input type="text" value="LINK_TEXT" name="LINK_TEXT" class="i18n text" />
       <input type="button" value="SET" name="SET" class="i18n button" />
-    <!-- /.set --></div>
+    <!-- /.str --></div>
     
     <h2 class="i18n">ACT_LINK_TEXT_HEADER</h2>
     <div class="opt str" id="ACT_LINK_TEXT">
       <span class="current text"></span>=&gt;
       <input type="text" value="ACT_LINK_TEXT" name="ACT_LINK_TEXT" class="i18n text" />
       <input type="button" value="SET" name="SET" class="i18n button" />
-    <!-- /.set --></div>
+    <!-- /.str --></div>
     
     <h2 class="i18n">USE_LINK_ICON_HEADER</h2>
     <div class="opt radio" id="USE_LINK_ICON">
-      <span><input type="radio" value="1" name="USE_LINK_ICON" id="USE_LINK_ICON_1" /><label for="USE_LINK_ICON_1" class="i18n">ENABLED</label></span>
-      <span><input type="radio" value="0" name="USE_LINK_ICON" id="USE_LINK_ICON_0" /><label for="USE_LINK_ICON_0" class="i18n">DISABLED</label></span>
-    <!-- /.select --></div>
+      <label><input type="radio" value="1" name="USE_LINK_ICON" /><span class="i18n">ENABLED</span></label>
+      <label><input type="radio" value="0" name="USE_LINK_ICON" /><span class="i18n">DISABLED</span></label>
+    <!-- /.radio --></div>
   
+    <h2 class="i18n">ENABLE_RECENT_RETWEET_USERS_BUTTON_HEADER</h2>
+    <div class="opt radio" id="ENABLE_RECENT_RETWEET_USERS_BUTTON">
+      <label><input type="radio" value="1" name="ENABLE_RECENT_RETWEET_USERS_BUTTON" /><span class="i18n">ENABLED</span></label>
+      <label><input type="radio" value="0" name="ENABLE_RECENT_RETWEET_USERS_BUTTON" /><span class="i18n">DISABLED</span></label>
+      
+      <div class="opt int" id="MAX_USER_NUMBER">
+        <span class="i18n">MAX_USER_NUMBER_HEADER</span><span>&nbsp;:&nbsp;</span><span class="current short_text"></span> =&gt;
+        <input type="text" value="8" name="MAX_USER_NUMBER" class="short_text" />
+        <input type="button" value="SET" name="SET" class="i18n button" />
+      <!-- /.int --></div>
+      
+    <!-- /.radio --></div>
+    
   </form>
   <form id="form_command"><input type="button" value="DEFAULT" name="DEFAULT" class="i18n button" /><input type="button" value="OPERATION" name="OPERATION" class="i18n button" /></form>
 

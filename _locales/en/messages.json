@@ -65,6 +65,12 @@
 , "USE_LINK_ICON_HEADER" : {
     "message": "Link Icons"
   }
+, "ENABLE_RECENT_RETWEET_USERS_BUTTON_HEADER" : {
+    "message" : "Buttons to display recent users that have retweeted"
+  }
+, "MAX_USER_NUMBER_HEADER" : {
+    "message" : "Max user number (limit:100)"
+  }
 , "ENABLED" : {
     "message": "enabled"
   }

@@ -84,12 +84,21 @@ var twDisplayVicinity_chrome_init = ( function() {
         ,   HIDE_NEWER_TWEETS : get_bool
         ,   USE_LINK_ICON : get_bool
         ,   IGNORE_SINCE : get_bool
+        ,   ENABLE_RECENT_RETWEET_USERS_BUTTON : get_bool
+        ,   CACHE_OAUTH2_ACCESS_TOKEN : get_bool
+        
         ,   HOUR_BEFORE : get_int
         ,   HOUR_AFTER : get_int
         ,   DAY_BEFORE : get_int
         ,   DAY_AFTER : get_int
+        ,   MAX_USER_NUMBER : get_int
+        ,   MAX_AFTER_RETWEET_MINUTES : get_int
+        ,   MAX_BEFORE_RETWEET_MINUTES : get_int
+        
         ,   TARGET_TWEET_COLOR : get_text
+        ,   TARGET_TWEET_COLOR_NIGHTMODE : get_text
         ,   VICINITY_TWEET_COLOR : get_text
+        ,   VICINITY_TWEET_COLOR_NIGHTMODE : get_text
         ,   LINK_COLOR : get_text
         ,   ACT_LINK_COLOR : get_text
         ,   LINK_TEXT : get_text

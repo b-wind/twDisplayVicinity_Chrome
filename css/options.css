@@ -88,7 +88,7 @@ input.text {
 span.short_text,
 input.short_text {
     display: inline-block;
-    width: 40px;
+    width: 30px;
     padding: 0 8px 0 8px;
 }
 

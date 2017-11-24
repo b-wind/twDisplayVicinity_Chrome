@@ -12,9 +12,11 @@ $( function () {
     var RADIO_KV_LIST = [
             { key : 'USE_SEARCH_TL_BY_DEFAULT', val : false }
         ,   { key : 'USE_LINK_ICON', val : true }
+        ,   { key : 'ENABLE_RECENT_RETWEET_USERS_BUTTON', val : true }
         ],
         INT_KV_LIST = [
             { key : 'HOUR_AFTER', val : 8, min : 0, max : null }
+        ,   { key : 'MAX_USER_NUMBER', val : 30, min : 1, max : 100 }
         ],
         STR_KV_LIST = [
             { key : 'LINK_TEXT' }
@@ -107,7 +109,10 @@ $( function () {
                 svalue = kv.val;
             }
             else {
-                svalue = parseInt( svalue );
+                if ( ! svalue ) {
+                    svalue = 0;
+                }
+                svalue = parseInt( svalue, 10 );
                 if ( ( ( kv.min !== null ) && ( svalue < kv.min ) ) || ( ( kv.max !== null ) && ( kv.max < svalue ) ) ) {
                     svalue = kv.val;
                 }

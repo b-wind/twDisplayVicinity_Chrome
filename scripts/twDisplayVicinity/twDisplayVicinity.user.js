@@ -2,11 +2,14 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.5.2
+// @version         0.2.6.1
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
 // @grant           GM_xmlhttpRequest
+// @grant           GM_setValue
+// @grant           GM_getValue
+// @connect         twitter.com
 // @description     Display the vicinity of a particular tweet on Twitter.
 // ==/UserScript==
 /*
@@ -76,14 +79,21 @@ var OPTIONS = {
     IGNORE_SINCE : true, // true: 検索タイムラインのオプションに since: を付けない
     
     TARGET_TWEET_COLOR : 'gold', // 対象ツイートの色
+    TARGET_TWEET_COLOR_NIGHTMODE : '#444400', // 対象ツイートの色（夜間モード）
     VICINITY_TWEET_COLOR : 'pink', // 近傍ツイートの色
-    //LINK_COLOR : 'darkblue', // 近傍リンクの色
-    LINK_COLOR : 'inherit', // 近傍リンクの色
-    //ACT_LINK_COLOR : 'indigo', // 通知リンクの色
-    ACT_LINK_COLOR : 'inherit', // 通知リンクの色
+    VICINITY_TWEET_COLOR_NIGHTMODE : '#440044', // 近傍ツイートの色（夜間モード）
+    // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
+    LINK_COLOR : 'inherit', // 近傍リンクの色('darkblue'→'inherit')
+    ACT_LINK_COLOR : 'inherit', // 通知リンクの色('indigo'→'inherit')
     
     HIDE_NEWER_TWEETS : true, // true: 最新のツイート(追加されたもの)を非表示
     USE_LINK_ICON : true, // 近傍リンクの種類（true: アイコンを使用 ／ false: 文字を使用
+    
+    ENABLE_RECENT_RETWEET_USERS_BUTTON : true, // true: 最近リツイートしたユーザーを表示するボタンを有効に
+    CACHE_OAUTH2_ACCESS_TOKEN : true, // true: OAuth2 の Access Token を再利用する
+    MAX_USER_NUMBER : 30, // 取得ユーザー数(API制限により、100ユーザまで) (ENABLE_RECENT_RETWEET_USERS_BUTTON が true の場合に使用)
+    MAX_AFTER_RETWEET_MINUTES : 10, // リツイート後のツイート取得期間(分)
+    MAX_BEFORE_RETWEET_MINUTES : 10, // リツイート前のツイート取得時間(分)
     
     OPERATION : true // true: 動作中、false: 停止中
 };
@@ -104,6 +114,10 @@ if ( w[ SCRIPT_NAME + '_touched' ] ) {
 w[ SCRIPT_NAME + '_touched' ] = true;
 
 if ( w !== w.parent ) {
+    return;
+}
+
+if ( /^https:\/\/twitter\.com\/i\/cards\//.test( w.location.href ) ) {
     return;
 }
 
@@ -146,6 +160,18 @@ switch ( LANGUAGE ) {
         OPTIONS.ACT_LINK_TEXT = '近傍';
         OPTIONS.ACT_LINK_TITLE = 'アクションの近傍ツイート表示';
         OPTIONS.GO_TO_PAST_TEXT = '以前のツイート↓';
+        OPTIONS.CLOSE_TEXT = '閉じる';
+        OPTIONS.RECENT_RETWEET_USERS_TEXT = '最近リツイートしたユーザー';
+        OPTIONS.LOADING_TEXT = '取得中...';
+        OPTIONS.LOADING_ERROR_TEXT = '読み込めませんでした';
+        OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE = '最近リツイートしたユーザーを表示';
+        OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT = 'Re:RT';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TITLE = 'リツイート前後のツイートを取得';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TEXT = '↓↑';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TITLE = '閉じる';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = '開く';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
         break;
     default:
         OPTIONS.LINK_TEXT = 'vicinity';
@@ -153,11 +179,30 @@ switch ( LANGUAGE ) {
         OPTIONS.ACT_LINK_TEXT = 'vicinity';
         OPTIONS.ACT_LINK_TITLE = 'search vicinity tweets around action';
         OPTIONS.GO_TO_PAST_TEXT = 'Go to past ↓';
+        OPTIONS.CLOSE_TEXT = 'Close';
+        OPTIONS.RECENT_RETWEET_USERS_TEXT = 'Recent Retweet Users';
+        OPTIONS.LOADING_TEXT = 'Loading...';
+        OPTIONS.LOADING_ERROR_TEXT = 'Load error';
+        OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE = 'Display recent users that have retweeted';
+        OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT = 'Re:RT';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TITLE = 'Retrieve Tweets around this Retweet';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TEXT = '↓↑';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TITLE = 'Close';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = 'Open';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
         break;
 }
 
 var SEARCH_API = 'https://twitter.com/search',
     TIMELINE_API_BASE = 'https://twitter.com/',
+    OAUTH2_TOKEN_API_URL = 'https://api.twitter.com/oauth2/token',
+    ENCODED_TOKEN_CREDENTIAL = 'ZUMwYjVTcDdTTW0xaUtES3lwQ3AySkpkZDpsbHMxZ040Q0ZQMFhmSmtvbEk2UjBZMkd6aWxjbHhqQUlrZkVZSHl3Ymh6TjhZcURlSA==',
+    API_RATE_LIMIT_STATUS = 'https://api.twitter.com/1.1/application/rate_limit_status.json',
+    API_STATUSES_RETWEETS_TEMPLATE = 'https://api.twitter.com/1.1/statuses/retweets/#TWEETID#.json?count=#NUMBER#',
+    API_FAVORITES_LIST_TEMPLATE = 'https://api.twitter.com/1.1/favorites/list.json?screen_name=#SCREEN_NAME#&count=200&include_entities=true',
+        // TODO: 「いいね」の方は API の仕様上、使い勝手がよくないため、保留
+    OAUTH2_ACCESS_TOKEN = null,
     
     LINK_CONTAINER_CLASS = SCRIPT_NAME + '_link_container',
     ACT_CONTAINER_CLASS = SCRIPT_NAME + '_act_container',
@@ -167,6 +212,8 @@ var SEARCH_API = 'https://twitter.com/search',
     INTV_CHECK_MS = 300, // チェック間隔(単位：ms)
     MAX_CHECK_RETRY = 10, // 'div.stream-end' 要素が表示されてから、チェックを終了するまでのリトライ回数(タイミングにより、いったん表示されてもまた消える場合がある)
     WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
+    LIMIT_STATUSES_RETWEETS_USER_NUMBER = 100, // statuses/retweets のユーザー数制限
+    DEFAULT_STATUSES_RETWEETS_USER_NUMBER = 30, // statuses/retweets のデフォルトユーザー数
     
     ID_INC_PER_MSEC = Decimal.pow( 2, 22 ), // ミリ秒毎のID増分
     ID_INC_PER_SEC = ID_INC_PER_MSEC.mul( 1000 ), // 秒毎のID増分
@@ -194,18 +241,32 @@ var SEARCH_API = 'https://twitter.com/search',
                 'ol.stream-items',
                 'ol.recent-tweets',
                 'div.permalink-tweet-container',
-                'div.GalleryTweet'
+                'div.GalleryTweet',
+                'div.activity-popup-dialog-content',
             ],
+            container_selector = SELECTOR_INFO.container_selector = container_selector_list.join( ',' ),
+            
             tweet_class_names = SELECTOR_INFO.tweet_class_names = [ 'js-stream-tweet', 'tweet', 'js-tweet' ],
             simple_tweet_selector = SELECTOR_INFO.simple_tweet_selector = tweet_class_names.map( function ( class_name ) {
                 return 'div.' + class_name;
             } ).join( ',' ),
-            container_selector = SELECTOR_INFO.container_selector = container_selector_list.join( ',' ),
             tweet_selector_list = SELECTOR_INFO.tweet_selector_list = [],
+            
             activity_class_names = SELECTOR_INFO.activity_class_names = [ 'stream-item-activity-notification' ],
             activity_selector = SELECTOR_INFO.activity_selector = activity_class_names.map( function ( class_name ) {
                 return 'div.' + class_name + '[data-activity-type]';
             } ).join( ',' ),
+            
+            action_to_tweet_container_selector_list = SELECTOR_INFO.action_to_tweet_container_selector_list = [
+                'ol.activity-popup-users'
+            ],
+            action_to_tweet_container_selector = SELECTOR_INFO.action_to_tweet_container_selector = action_to_tweet_container_selector_list.join( ',' ),
+            
+            action_to_tweet_class_names = SELECTOR_INFO.action_to_tweet_class_names = [ 'js-actionable-user' ],
+            action_to_tweet_selector = SELECTOR_INFO.action_to_tweet_selector = action_to_tweet_class_names.map( function ( class_name ) {
+                return 'div.' + class_name + '[data-screen-name]';
+            } ).join( ',' ),
+            
             tweet_wrapper_selector = SELECTOR_INFO.tweet_wrapper_selector = 'div.StreamItem:first,div.Grid:first,li:first';
        
         container_selector_list.forEach( function ( container_selector_item ) {
@@ -254,7 +315,9 @@ var SEARCH_API = 'https://twitter.com/search',
         //  "Execution of script 'twDisplayVicinity' failed! Cannot set property name of #<Object> which has only a getter" ( by Tampermonkey )
         
         return search_parameters;
-    } )();
+    } )(),
+    
+    TWEET_ID_TO_RETWEETED_INFO = {};
 
 //} end of global variables
 
@@ -281,6 +344,58 @@ function log_error() {
     
     console.error.apply( console, arg_list.concat( to_array( arguments ) ) );
 } // end of log_error()
+
+
+var set_value = ( function () {
+    if ( typeof GM_setValue != 'undefined' ) {
+        return function ( name, value ) {
+            return GM_setValue( name, value );
+        };
+    }
+    return function ( name, value ) {
+        return localStorage.setItem( name, value );
+    };
+} )(); // end of set_value()
+
+
+var get_value = ( function () {
+    if ( typeof GM_getValue != 'undefined' ) {
+        return function ( name ) {
+            var value = GM_getValue( name );
+            
+            // メモ： 値が存在しない場合、GM_getValue( name ) は undefined を返す
+            return ( value === undefined ) ? null : value;
+        };
+    }
+    return function ( name ) {
+        // メモ： 値が存在しない場合、localStorage[ name ] は undefined を、localStorage.getItem( name ) は null を返す
+        return localStorage.getItem( name );
+    };
+} )(); // end of get_value()
+
+
+var object_extender = ( function () {
+    function object_extender( base_object ) {
+        var template = object_extender.template,
+            base_object = template.prototype = base_object,
+            expanded_object = new template(),
+            object_list = to_array( arguments );
+        
+        object_list.shift();
+        object_list.forEach( function ( object ) {
+            Object.keys( object ).forEach( function ( name ) {
+                expanded_object[ name ] = object[ name ];
+            } );
+        } );
+        
+        return expanded_object;
+    } // end of object_extender()
+    
+    
+    object_extender.template = function () {};
+    
+    return object_extender;
+} )(); // end of object_extender()
 
 
 // 参考: [複数のクラス名の存在を確認（判定） | jQuery逆引き | Webサイト制作支援 | ShanaBrian Website](http://shanabrian.com/web/jquery/has-classes.php)
@@ -400,6 +515,28 @@ function datetime_to_tweet_id( datetime ) {
 } // end of datetime_to_tweet_id()
 
 
+function get_date_from_tweet_id( tweet_id, offset_sec ) {
+    var tweet_date = tweet_id_to_date( tweet_id );
+    
+    if ( ! tweet_date ) {
+        return null;
+    }
+    
+    return new Date( tweet_date.getTime() + ( ( offset_sec ) ? ( 1000 * offset_sec ) : 0 ) );
+} // end of get_date_from_tweet_id()
+
+
+function tweet_id_shift( tweet_id, offset_sec ) {
+    var tweet_date_shift = get_date_from_tweet_id( tweet_id, offset_sec );
+    
+    if ( ! tweet_date_shift ) {
+        return null;
+    }
+    
+    return datetime_to_tweet_id( tweet_date_shift );
+} // end of tweet_id_shift()
+
+
 function get_gmt_date( time_sec ) {
     var date = new Date( 1000 * time_sec );
     
@@ -415,13 +552,11 @@ function get_gmt_datetime( time_sec ) {
 
 
 function get_gmt_datetime_from_tweet_id( tweet_id, offset_sec ) {
-    var tweet_date = tweet_id_to_date( tweet_id );
+    var tweet_date_shift = get_date_from_tweet_id( tweet_id, offset_sec );
     
-    if ( ! tweet_date ) {
+    if ( ! tweet_date_shift ) {
         return null;
     }
-    
-    var tweet_date_shift = new Date( tweet_date.getTime() + ( ( offset_sec ) ? ( 1000 * offset_sec ) : 0 ) );
     
     return format_date( tweet_date_shift, 'YYYY-MM-DD_hh:mm:ss_GMT', true );
 } // end of get_gmt_datetime_from_tweet_id()
@@ -531,7 +666,7 @@ function get_search_info( parameters ) {
         since = get_gmt_datetime_from_tweet_id( since_id );
         until = get_gmt_datetime_from_tweet_id( max_id, 1 );
         
-        search_url_list.push( TIMELINE_API_BASE + screen_name + '/with_replies?max_position=' + max_id );
+        search_url_list.push( TIMELINE_API_BASE + screen_name + '/with_replies?max_position=' + Decimal.add( max_id, 1 ).toString() );
         // 0.2.3.10: max_id → max_position
         
         if ( OPTIONS.IGNORE_SINCE ) {
@@ -557,7 +692,7 @@ function get_search_info( parameters ) {
             }
         }
         else if ( max_id ) {
-            search_url_list.push( TIMELINE_API_BASE + screen_name + '/with_replies?max_position=' + max_id );
+            search_url_list.push( TIMELINE_API_BASE + screen_name + '/with_replies?max_position=' + Decimal.add( max_id, 1 ).toString() );
             // 0.2.3.10: max_id → max_position
             
             until = get_gmt_datetime_from_tweet_id( max_id, 1 );
@@ -617,6 +752,11 @@ function is_search_mode() {
 } // end of is_search_mode()
 
 
+function is_night_mode() {
+    return $( '#user-dropdown .js-nightmode-icon' ).hasClass( 'Icon--crescentFilled' );
+} // end of is_night_mode()
+
+
 function get_hide_threshold_tweet_id() {
     if ( ( ! OPTIONS.HIDE_NEWER_TWEETS ) || ( ! is_search_mode() ) ) {
         return 0;
@@ -624,17 +764,17 @@ function get_hide_threshold_tweet_id() {
     
     var search_tweet_id = SEARCH_PARAMETERS.search_tweet_id,
         max_id = SEARCH_PARAMETERS.max_id,
-        threshold_tweet_id = search_tweet_id || max_id;
+        limit_tweet_id = search_tweet_id || max_id;
     
-    if ( ! threshold_tweet_id ) {
+    if ( ! limit_tweet_id ) {
         return 0;
     }
     
-    if ( ( max_id ) && ( bignum_cmp( threshold_tweet_id, max_id ) < 0 ) ) {
-        threshold_tweet_id = max_id;
+    if ( ( max_id ) && ( bignum_cmp( limit_tweet_id, max_id ) < 0 ) ) {
+        limit_tweet_id = max_id;
     }
     
-    return threshold_tweet_id;
+    return Decimal.add( limit_tweet_id, 1 ).toString();
 } // end of get_hide_threshold_tweet_id()
 
 
@@ -677,16 +817,12 @@ var open_child_window = ( function () {
     } )(); // end of open_child_window()
 
 
-var click_handler_saver = ( function() {
-        function ClickHandlerSaver() {
-            var self = this;
-            
-            self.link_id_prefix = SCRIPT_NAME + '_link_';
-            self.link_id_number = 0;
-            self.link_dict = [];
-        } // end of ClickHandlerSaver()
+var click_handler_saver = object_extender( {
+        link_id_prefix : SCRIPT_NAME + '_link_',
+        link_id_number : 0,
+        link_dict : [],
         
-        ClickHandlerSaver.prototype.set_click_handler = function ( jq_link, onclick ) {
+        set_click_handler : function ( jq_link, onclick ) {
             var self = this,
                 link_id = ( self.link_id_prefix ) + ( self.link_id_number ++ );
             
@@ -707,16 +843,14 @@ var click_handler_saver = ( function() {
             // → document の mouseover イベントを監視し、onclick イベントが link_dict に登録されている場合には、イベントを再設定するように修正
             
             return link_id;
-        }; // end of set_click_handler()
+        }, // end of set_click_handler()
         
-        ClickHandlerSaver.prototype.get_click_handler = function ( link_id ) {
+        get_click_handler : function ( link_id ) {
             var self = this;
             
             return self.link_dict[ link_id ];
-        }; // end of get_click_handler()
-        
-        return new ClickHandlerSaver();
-    } )(),
+        } // end of get_click_handler()
+    } ),
     
     set_click_handler = function () {
         return click_handler_saver.set_click_handler.apply( click_handler_saver, arguments );
@@ -725,6 +859,903 @@ var click_handler_saver = ( function() {
     get_click_handler = function () {
         return click_handler_saver.get_click_handler.apply( click_handler_saver, arguments );
     };
+
+
+var TemplateUserTimeline = {
+        DEFAULT_UNTIL_ID : '9223372036854775807', // 0x7fffffffffffffff = 2^63-1
+        
+        init : function ( screen_name, max_tweet_id ) {
+            var self = this;
+            
+            self.timeline_status = 'user'; // 'user' / 'end' / 'error' / 'stop'
+            self.screen_name = screen_name;
+            self.current_max_position = self.current_min_id = self.until_id = ( max_tweet_id ) ? Decimal.add( max_tweet_id, 1 ).toString() : self.DEFAULT_UNTIL_ID;
+            self.tweet_info_list = [];
+            
+            self.user_timeline_parameters = {
+                api_endpoint : {
+                    url : 'https://twitter.com/i/profiles/show/' + screen_name + '/timeline/with_replies',
+                    data : {
+                        include_available_features : 1,
+                        include_entities : 1,
+                        reset_error_state : false,
+                        last_note_ts : null,
+                        max_position : null
+                    }
+                }
+            };
+            
+            return self;
+        }, // end of init()
+        
+        fetch_tweet_info : function ( callback ) {
+            var self = this,
+                tweet_info = self.tweet_info_list.shift();
+            
+            if ( tweet_info ) {
+                var check_tweet_id = ( tweet_info.retweet_id || tweet_info.tweet_id );
+                
+                if ( bignum_cmp( self.current_min_id, check_tweet_id ) <= 0 ) {
+                    if ( self.timeline_status == 'stop' ) {
+                        callback( {
+                            tweet_info : null
+                        ,   timeline_status : self.timeline_status
+                        } );
+                        return self;
+                    }
+                    return self.fetch_tweet_info( callback );
+                }
+                
+                self.current_min_id = check_tweet_id;
+                
+                callback( {
+                    tweet_info : tweet_info
+                ,   timeline_status : self.timeline_status
+                } );
+                
+                return self;
+            }
+            
+            switch ( self.timeline_status ) {
+                case 'user' :
+                    self.__get_next_user_timeline( function () {
+                        return self.fetch_tweet_info( callback );
+                    } );
+                    break;
+                
+                case 'stop' :
+                case 'error' :
+                default :
+                    callback( {
+                        tweet_info : tweet_info
+                    ,   timeline_status : self.timeline_status
+                    } );
+                    break;
+            }
+            return self;
+        }, // end of fetch_tweet_info()
+        
+        stop : function () {
+            var self = this;
+            
+            self.timeline_status = 'stop';
+        }, // end of stop()
+        
+        __get_last_note_ts : function () {
+            var self = this,
+                last_note_ts = new Date().getTime();
+            
+            return last_note_ts;
+        }, // end of __get_last_note_ts()
+        
+        __get_tweet_info : function ( jq_tweet_container ) {
+            var tweet_info = {},
+                tweet_url,
+                date,
+                timestamp_ms,
+                image_urls = [],
+                jq_tweet = jq_tweet_container.find( '.js-stream-tweet' );
+            
+            if ( jq_tweet.length <= 0 ) {
+                return;
+            }
+            
+            tweet_url = jq_tweet_container.find( '.js-permalink' ).attr( 'href' );
+            if ( ! tweet_url ) {
+                // '.js-stream-item' のうち、Tweet でないため、Permalink が取得できないものもある（「タグ付けされたユーザー」等）
+                return;
+            }
+            if ( tweet_url.charAt( 0 ) == '/' ) {
+                tweet_url = 'https://twitter.com' + tweet_url;
+            }
+            
+            try {
+                tweet_info.tweet_url = tweet_url;
+                tweet_info.tweet_id = jq_tweet.attr( 'data-tweet-id' );
+                tweet_info.tweet_screen_name = jq_tweet.attr( 'data-screen-name' );
+                tweet_info.retweet_id = jq_tweet.attr( 'data-retweet-id' );
+                tweet_info.retweeter = jq_tweet.attr( 'data-retweeter' );
+                tweet_info.timestamp_ms = timestamp_ms = jq_tweet.find( '*[data-time-ms]' ).attr( 'data-time-ms' );
+                tweet_info.date = date = new Date( parseInt( timestamp_ms, 10 ) );
+                tweet_info.tweet_text = jq_tweet.find( '.js-tweet-text, .tweet-text' ).text();
+            }
+            catch ( error ) {
+                // '.js-stream-item' のうち、Tweet でないため、screen_name 等が取得できないものもある（「タグ付けされたユーザー」等）
+                return;
+            }
+            return tweet_info;
+        }, // end of __get_tweet_info()
+        
+        __get_next_user_timeline : function ( callback ) {
+            var self = this,
+                api_endpoint = self.user_timeline_parameters.api_endpoint,
+                data = api_endpoint.data;
+            
+            data.last_note_ts = self.__get_last_note_ts();
+            data.max_position = self.current_max_position;
+            
+            $.getJSON( api_endpoint.url, data )
+            .success( function ( json ) {
+                var tweet_info_list = self.tweet_info_list,
+                    tweet_count = 0,
+                    min_id = self.DEFAULT_UNTIL_ID;
+                
+                $( '<div/>' ).html( json.items_html ).find( '.js-stream-item' ).each( function () {
+                    var jq_stream_item = $( this ),
+                        tweet_info = self.__get_tweet_info( jq_stream_item );
+                    
+                    if ( ( ! tweet_info ) || ( ! tweet_info.tweet_id  ) ) {
+                        return;
+                    }
+                    
+                    tweet_info.jq_stream_item = jq_stream_item;
+                    
+                    tweet_info_list.push( tweet_info );
+                    
+                    if ( bignum_cmp( tweet_info.tweet_id, min_id ) < 0 ) {
+                        min_id = tweet_info.tweet_id;
+                    }
+                    tweet_count ++;
+                } );
+                
+                if ( json.min_position ) {
+                    self.current_max_position = json.min_position;
+                }
+                else if ( bignum_cmp( min_id, self.current_max_position ) < 0 ) {
+                    self.current_max_position = min_id;
+                }
+                else {
+                    self.timeline_status = 'end';
+                }
+                
+                if ( ! json.has_more_items ) {
+                    self.timeline_status = 'end';
+                }
+            } )
+            .error( function ( jqXHR, textStatus, errorThrown ) {
+                log_error( api_endpoint.url, textStatus );
+                self.timeline_status = 'error';
+            } )
+            .complete( function () {
+                callback();
+            } );
+        } // end of __get_next_user_timeline()
+    
+    }; // end of TemplateUserTimeline
+
+
+var recent_retweet_users_dialog = object_extender( {
+        dialog_template : [
+            '<div id="#SCRIPT_NAME#-dialog-container">',
+            '  <div class="#SCRIPT_NAME#-dialog modal-content">',
+            '    <div class="#SCRIPT_NAME#-header-container modal-header clearfix">',
+            '      <h3 class="modal-title"></h3>',
+            '      <span class="#SCRIPT_NAME#-button-close Icon Icon--close Icon--large" title="#CLOSE#""></span>',
+            '    </div>',
+            '    <div class="#SCRIPT_NAME#-content-container clearfix">',
+            '      <div class="loading">',
+            '        <span class="spinner-bigger"></span>',
+            '      </div>',
+            '      <ol class="activity-popup-users" id="#SCRIPT_NAME#-recent-retweet-users">',
+            '      </ol>',
+            '    </div>',
+            '  </div>',
+            '</div>'
+        ].join( '\n' ),
+        
+        user_template : [
+            '<li class="js-stream-item stream-item stream-item" data-item-id="#USER_ID#" id="stream-item-user-#USER_ID#" data-item-type="user">',
+            '  <div class="account js-actionable-user js-profile-popup-actionable" data-screen-name="#SCREEN_NAME#" data-user-id="#USER_ID#" data-name="#USER_NAME#" data-emojified-name="" data-feedback-token="" data-impression-id="" data-retweeted-tweet-id="#RETWEETED_TWEET_ID#" data-retweet-id="#RETWEET_ID#">',
+            '    <div class="activity-user-profile-content">',
+            '      <div class="content">',
+            '        <div class="stream-item-header">',
+            '          <a class="account-group js-user-profile-link" href="/#SCREEN_NAME#" rel="noopener">',
+            '            <img class="avatar js-action-profile-avatar" src="#ICON_URL#" alt="" data-user-id="#USER_ID#">',
+            '            <strong class="fullname">#USER_NAME#</strong><span class="UserBadges"></span><span class="UserNameBreak">&nbsp;</span>',
+            '            <span class="username u-dir" dir="ltr">@<b>#SCREEN_NAME#</b></span>',
+            '          </a>',
+            '        </div>',
+            '        <p class="bio u-dir" dir="ltr"></p>',
+            '      </div>',
+            '    </div>',
+            '    <div class="IconContainer js-tooltip load" data-original-title="">',
+            '      <button class="btn">↓↑</button>',
+            '    </div>',
+            '    <div class="IconContainer js-tooltip close" data-original-title="">',
+            '      <button class="btn">↑</button>',
+            '    </div>',
+            '    <div class="IconContainer js-tooltip open" data-original-title="">',
+            '      <button class="btn">↓</button>',
+            '    </div>',
+            '    <div class="loading">',
+            '      <span class="spinner-bigger"></span>',
+            '    </div>',
+            '  </div>',
+            '</li>'
+        ].join( '\n' ),
+        
+        retweet_timeinfo_template : [
+            '<li class="js-stream-item stream-item stream-item">',
+            '  <div class="tweet js-stream-tweet retweeted">',
+            '    <div class="context">',
+            '      <div class="tweet-context with-icn">',
+            '        <span class="Icon Icon--small Icon--retweeted"></span>',
+            '        <span class="_timestamp js-short-timestamp""></span>',
+            '      </div>',
+            '    </div>',
+            '  </div>',
+            '</li>'
+        ].join( '\n' ),
+        
+        
+        init : function () {
+            var self = this,
+                jq_dialog_container = self.jq_dialog_container = $(
+                    self.dialog_template
+                    .replace( /#SCRIPT_NAME#/g, SCRIPT_NAME )
+                    .replace( /#CLOSE#/g, OPTIONS.CLOSE_TEXT )
+                )
+                .css( {
+                    'position' : 'fixed',
+                    'top' : '0',
+                    'right' : '0',
+                    'bottom' : '0',
+                    'left' : '0',
+                    'overflow' : 'auto',
+                    'z-index' : '3000',
+                    'background' : 'rgba( 0, 0, 0, 0.8 )'
+                } )
+                .click( function ( event ) {
+                    var jq_target = $( event.target );
+                    
+                    if ( jq_target.attr( 'id' ) != jq_dialog_container.attr( 'id' ) ) {
+                        return;
+                    }
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    self.close();
+                    
+                    return false;
+                } ),
+                
+                jq_dialog = self.jq_dialog = jq_dialog_container.find( '.' + SCRIPT_NAME + '-dialog' ).css( {
+                    'position' : 'absolute',
+                    'top' : '50%',
+                    'left' : '50%',
+                    'width' : '640px',
+                    'height' : '480px',
+                    'margin' : '-240px 0px 0px -320px',
+                    'padding' : '0 0 0 0',
+                    'overflow-x' : 'hidden',
+                    'overflow-y' : 'hidden',
+                    'border-radius' : '6px',
+                    'background' : ( is_night_mode() ? '#182430' : '#f5f8fa' )
+                } ),
+                
+                jq_header_container = self.jq_header_container = jq_dialog.find( '.' + SCRIPT_NAME + '-header-container' ).css( {
+                    'width' : '100%',
+                    'height' : '30px',
+                    'position' : 'relative',
+                    'margin' : '0 0 0 0',
+                    'padding' : '0 0 0 0'
+                } ),
+                
+                jq_title = self.jq_title = jq_header_container.find( 'h3' ).css( {
+                    'width' : '100%',
+                    'height' : '100%',
+                    'text-align' : 'center',
+                    'padding-top' : '2px'
+                } ),
+                
+                jq_close = self.jq_close = jq_header_container.find( '.' + SCRIPT_NAME + '-button-close' ).css( {
+                    'position' : 'absolute',
+                    'top' : '2px',
+                    'right' : '2px',
+                    'cursor' : 'pointer'
+                } )
+                .click( function ( event ) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    self.close();
+                    
+                    return false;
+                } ),
+                
+                jq_content_container = self.jq_content_container = jq_dialog.find( '.' + SCRIPT_NAME + '-content-container' ).css( {
+                    'width' : '100%',
+                    'height' : '450px',
+                    'position' : 'relative'
+                } ),
+                
+                jq_loading = self.jq_loading = jq_content_container.find( '.loading' ).css( {
+                    'position' : 'absolute',
+                    'top' : '50%',
+                    'left' : '50%',
+                    'transform' : 'translate(-50%, -50%)',
+                    'z-index' : '10001'
+                } ),
+                
+                jq_user_list = self.jq_user_list = jq_content_container.find( 'ol.activity-popup-users' ).css( {
+                    'width' : '100%',
+                    'height' : '100%',
+                    'max-height' : '100%',
+                    'padding' : '0 0 0 0',
+                    'overflow-y' : 'scroll',
+                    'overflow-x' : 'hidden',
+                } );
+            
+            jq_dialog_container.hide();
+            
+            $( 'body' ).append( jq_dialog_container );
+            
+            self.current_request_id = 0;
+            self.mouse_wheel_event_name = ( 'onwheel' in d ) ? 'wheel' : ( ( 'onmousewheel' in d ) ? 'mousewheel' : 'DOMMouseScroll' );
+            
+            return self;
+        }, // end of init()
+        
+        
+        open : function ( retweeted_tweet_id ) {
+            var self = this,
+                jq_dialog_container = self.jq_dialog_container,
+                jq_dialog = self.jq_dialog,
+                jq_title = self.jq_title,
+                jq_loading = self.jq_loading,
+                jq_user_list = self.jq_user_list;
+            
+            self.retweeted_tweet_id = retweeted_tweet_id;
+            
+            self.saved_body_overflow_x = $( d.body ).css( 'overflow-x' );
+            self.saved_body_overflow_y = $( d.body ).css( 'overflow-y' );
+            
+            $( d.body )
+            .keydown( function ( event ) {
+                switch ( event.keyCode ) {
+                    case 27 :
+                        event.stopPropagation();
+                        event.preventDefault();
+                        
+                        self.close();
+                        return false;
+                }
+            } )
+            .css( {
+                'overflow-x' : 'hidden',
+                'overflow-y' : 'hidden'
+            } );
+            
+            // デフォルトのマウスホイール動作を無効化し、ユーザーリスト部分のみマウスホイールが効くようにする
+            // TODO: スクロールがぎこちなくなるので保留
+            /*
+            //$( d ).on( self.mouse_wheel_event_name, function ( event ) {
+            //    event.stopPropagation();
+            //    event.preventDefault();
+            //    
+            //    return false;
+            //} );
+            //
+            //$( jq_user_list ).on( self.mouse_wheel_event_name, function ( event ) {
+            //    var delta = ( event.originalEvent.deltaY ) ? -( event.originalEvent.deltaY ) : ( ( event.originalEvent.wheelDelta ) ? event.originalEvent.wheelDelta : -( event.originalEvent.detail ) );
+            //    jq_user_list.scrollTop( jq_user_list.scrollTop() - delta );
+            //    
+            //    event.stopPropagation();
+            //    event.preventDefault();
+            //    
+            //    return false;
+            //} );
+            */
+            
+            jq_user_list.empty();
+            jq_title.text( OPTIONS.LOADING_TEXT );
+            jq_loading.show();
+            
+            self.current_request_id ++;
+            
+            self.__load_recent_retweet_user_info( self.current_request_id, retweeted_tweet_id, function ( request_id, result_message, retweet_user_info_list ) {
+                if ( result_message != 'ok' ) {
+                    jq_loading.hide();
+                    
+                    if ( result_message != 'ignore' ) {
+                        jq_title.text( OPTIONS.LOADING_ERROR_TEXT  );
+                    }
+                    return;
+                }
+                
+                var load_image_counter = 0,
+                    user_id_map = {},
+                    retweet_user_info_to_show_list = [],
+                    max_user_number = self.__get_max_user_number(),
+                    timeout_timer_id = setTimeout( function () {
+                        timeout_timer_id = null;
+                    }, 10000 );
+                
+                
+                function check_all_images_loaded() {
+                    if ( request_id != self.current_request_id ) {
+                        if ( timeout_timer_id ) {
+                            clearTimeout( timeout_timer_id );
+                            timeout_timer_id = null;
+                        }
+                        return;
+                    }
+                    
+                    load_image_counter --;
+                    
+                    if ( ( timeout_timer_id  ) && ( 0 < load_image_counter ) ) {
+                        return;
+                    }
+                    
+                    if ( timeout_timer_id ) {
+                        clearTimeout( timeout_timer_id );
+                        timeout_timer_id = null;
+                    }
+                    
+                    self.screen_name_to_retweet_user_info_map = {};
+                    
+                    retweet_user_info_to_show_list.forEach( function( retweet_user_info ) {
+                        self.screen_name_to_retweet_user_info_map[ retweet_user_info.user.screen_name ] = retweet_user_info;
+                        self.__insert_user( retweeted_tweet_id, retweet_user_info );
+                    } );
+                    
+                    self.retweet_user_info_to_show_list = retweet_user_info_to_show_list;
+                    
+                    var jq_spacer = $( '<li class="spacer"></li>' ).css( {
+                            'height' : '14px'
+                        } );
+                    
+                    self.jq_user_list.append( jq_spacer );
+                    
+                    jq_loading.hide();
+                    
+                    jq_title.text( OPTIONS.RECENT_RETWEET_USERS_TEXT );
+                } // end of check_complete()
+                
+                
+                retweet_user_info_list.forEach( function( retweet_user_info ) {
+                    if ( user_id_map[ retweet_user_info.user.id_str ] ) {
+                        return;
+                    }
+                    
+                    user_id_map[ retweet_user_info.user.id_str ] = true;
+                    
+                    if ( max_user_number <= load_image_counter ) {
+                        return;
+                    }
+                    
+                    retweet_user_info_to_show_list.push( retweet_user_info );
+                    
+                    load_image_counter ++;
+                    
+                    var jq_image = $( new Image() );
+                    
+                    jq_image
+                    .on( 'load', function( event ) {
+                        check_all_images_loaded();
+                    } )
+                    .on( 'error', function( event ) {
+                        check_all_images_loaded();
+                    } );
+                    
+                    jq_image.attr( 'src', retweet_user_info.user.profile_image_url_https );
+                } );
+            } );
+            
+            jq_dialog.css( {
+                'background' : ( is_night_mode() ? '#182430' : '#f5f8fa' )
+            } );
+            
+            jq_dialog_container.show();
+            
+            return self;
+        }, // end of open()
+        
+        
+        close : function () {
+            var self = this,
+                jq_dialog_container = self.jq_dialog_container,
+                jq_user_list = self.jq_user_list;
+            
+            $( jq_user_list ).unbind( self.mouse_wheel_event_name );
+            
+            $( d ).unbind( self.mouse_wheel_event_name );
+            
+            $( d.body )
+            .css( {
+                'overflow-x' : self.saved_body_overflow_x,
+                'overflow-y' : self.saved_body_overflow_y,
+                'overflow' : ''
+            } )
+            .unbind( self.mouse_wheel_event_name )
+            .unbind( 'keydown' );
+            
+            jq_dialog_container.hide();
+            
+            return self;
+        }, // end of close()
+        
+        
+        __load_recent_retweet_user_info : function ( request_id, retweeted_tweet_id, callback ) {
+            var self = this,
+                max_user_number = self.__get_max_user_number(),
+                limit_user_number = max_user_number + 10, // 数が少なく取れたり重複したりするケースもあるので、大目に指定
+                statuses_retweets_url = API_STATUSES_RETWEETS_TEMPLATE.replace( /#TWEETID#/g, retweeted_tweet_id ).replace( /#NUMBER#/g, '' + limit_user_number );
+            
+            $.ajax( {
+                type : 'GET',
+                url : statuses_retweets_url,
+                dataType : 'json',
+                headers : {
+                    'Authorization' : 'Bearer ' + OAUTH2_ACCESS_TOKEN
+                }
+            } )
+            .success( function ( retweet_user_info_list ) {
+                if ( request_id != self.current_request_id ) {
+                    callback( request_id, 'ignore', retweet_user_info_list );
+                    return;
+                }
+                
+                callback( request_id, 'ok', retweet_user_info_list );
+            } )
+            .error( function ( jqXHR, textStatus, errorThrown ) {
+                log_error( statuses_retweets_url, textStatus );
+                callback( request_id, 'load error: ' + textStatus, null );
+            } )
+            .complete( function () {
+            } );
+            
+            return self;
+        }, // end of __load_recent_retweet_user_info()
+        
+        
+        __get_max_user_number : function () {
+            if ( ( ! OPTIONS.MAX_USER_NUMBER ) || isNaN( OPTIONS.MAX_USER_NUMBER ) ) {
+                return DEFAULT_STATUSES_RETWEETS_USER_NUMBER;
+            }
+            var max_user_number = parseInt( OPTIONS.MAX_USER_NUMBER, 10 );
+            
+            if ( ( max_user_number < 1 ) || ( LIMIT_STATUSES_RETWEETS_USER_NUMBER < max_user_number ) ) {
+                return DEFAULT_STATUSES_RETWEETS_USER_NUMBER;
+            }
+            
+            return max_user_number;
+        }, // end of __get_max_user_number()
+        
+        
+        __insert_user : function ( retweeted_tweet_id, retweet_user_info ) {
+            var self = this,
+                jq_user_list = self.jq_user_list,
+                jq_user = $(
+                    self.user_template
+                    .replace( /#RETWEETED_TWEET_ID#/g, retweeted_tweet_id ) // retweet_user_info.retweeted_status.id_str でも良い
+                    .replace( /#RETWEET_ID#/g, retweet_user_info.id_str )
+                    .replace( /#USER_ID#/g, retweet_user_info.user.id_str )
+                    .replace( /#SCREEN_NAME#/g, retweet_user_info.user.screen_name )
+                ),
+                
+                jq_user_content = jq_user.find( '.activity-user-profile-content .content' ).css( {
+                    'margin-right' : '60px'
+                } ),
+                
+                jq_avatar = jq_user.find( 'img.avatar' ).css( {
+                } )
+                .attr( 'src', retweet_user_info.user.profile_image_url_https ),
+                
+                jq_user_fullname = jq_user.find( 'strong.fullname' ).css( {
+                    'min-width' : '50px'
+                } )
+                .text( retweet_user_info.user.name ),
+                
+                jq_screen_name = jq_user.find( 'span.username b' ).css( {
+                    'word-break' : 'break-all'
+                } )
+                .text( retweet_user_info.user.screen_name ),
+                
+                jq_bio = jq_user.find( 'p.bio' ).css( {
+                    'font-size' : '12px',
+                    'opacity' : '0.8'
+                } )
+                .text( retweet_user_info.user.description ),
+                
+                jq_referece_to_retweet_load_button_wrapper = jq_user.find( 'div.IconContainer.load' ).css( {
+                    'position' : 'absolute',
+                    'bottom' : '8px',
+                    'right' : '6px'
+                } )
+                .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TITLE ),
+                
+                jq_referece_to_retweet_load_button = jq_referece_to_retweet_load_button_wrapper.find( 'button.btn' ).css( {
+                    'font-size' : '14px',
+                    'padding' : '6px 8px',
+                    'cursor' : 'pointer'
+                } )
+                .text( OPTIONS.REFERECE_TO_RETWEET_LOAD_BUTTON_TEXT ),
+                
+                jq_referece_to_retweet_close_button_wrapper = jq_user.find( 'div.IconContainer.close' ).css( {
+                    'position' : 'absolute',
+                    'bottom' : '8px',
+                    'right' : '6px'
+                } )
+                .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TITLE )
+                .hide(),
+                
+                jq_referece_to_retweet_close_button = jq_referece_to_retweet_close_button_wrapper.find( 'button.btn' ).css( {
+                    'font-size' : '16px',
+                    'padding' : '2px 8px',
+                    'cursor' : 'pointer'
+                } )
+                .text( OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT ),
+                
+                jq_referece_to_retweet_open_button_wrapper = jq_user.find( 'div.IconContainer.open' ).css( {
+                    'position' : 'absolute',
+                    'bottom' : '8px',
+                    'right' : '6px'
+                } )
+                .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE )
+                .hide(),
+                
+                jq_referece_to_retweet_open_button = jq_referece_to_retweet_open_button_wrapper.find( 'button.btn' ).css( {
+                    'font-size' : '16px',
+                    'padding' : '2px 8px',
+                    'cursor' : 'pointer'
+                } )
+                .text( OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT ),
+                
+                jq_referece_to_retweet_loading = jq_user.find( '.loading' ).css( {
+                    'position' : 'absolute',
+                    'z-index' : '3001',
+                    'right' : '6px',
+                    'bottom' : '2px'
+                } )
+                .hide();
+            
+            jq_user.find( SELECTOR_INFO.action_to_tweet_selector ).attr( 'data-name', retweet_user_info.user.name );
+            
+            jq_user_content.find( 'a.account-group' ).css( {
+                'min-width' : '0',
+                'max-width' : '470px'
+            } );
+            
+            
+            jq_referece_to_retweet_load_button.click( function ( event ) {
+                event.stopPropagation();
+                event.preventDefault();
+                
+                self.__load_referece_to_retweet(
+                    retweet_user_info.id_str,
+                    retweet_user_info.user,
+                    jq_user,
+                    jq_referece_to_retweet_load_button,
+                    jq_referece_to_retweet_loading,
+                    jq_referece_to_retweet_close_button,
+                    jq_referece_to_retweet_open_button
+                );
+                
+                return false;
+            } );
+            
+            
+            self.jq_user_list.append( jq_user );
+            
+        }, // end of __insert_user()
+        
+        
+        __load_referece_to_retweet : function ( retweet_id, user, jq_user,  jq_referece_to_retweet_load_button, jq_referece_to_retweet_loading, jq_referece_to_retweet_close_button, jq_referece_to_retweet_open_button ) {
+            var self = this,
+                screen_name = user.screen_name,
+                until_tweet_id = tweet_id_shift( retweet_id, 60 * OPTIONS.MAX_AFTER_RETWEET_MINUTES ),
+                since_tweet_id = tweet_id_shift( retweet_id, -( 60 * OPTIONS.MAX_BEFORE_RETWEET_MINUTES ) );
+            
+            jq_referece_to_retweet_load_button.parent().hide();
+            jq_referece_to_retweet_loading.show();
+            
+            if ( ! until_tweet_id ) {
+                jq_referece_to_retweet_loading.hide();
+                log_error( '[TODO] out of range' );
+                return;
+            }
+            
+            if ( ! since_tweet_id ) {
+                since_tweet_id = ID_THRESHOLD;
+            }
+            
+            log_debug( 'search conditaions: ', screen_name, since_tweet_id, '～', retweet_id, '～', until_tweet_id );
+            
+            var tweet_counter = 0,
+                jq_insert_point = jq_user,
+                jq_stream_item_list = [],
+                user_timeline = object_extender( TemplateUserTimeline ).init( screen_name, until_tweet_id );
+            
+            
+            function complete() {
+                jq_referece_to_retweet_loading.hide();
+                
+                if ( jq_stream_item_list.length <= 0 ) {
+                    var retweet_user_info = self.screen_name_to_retweet_user_info_map[ screen_name ],
+                        retweet_timestamp = format_date( new Date( retweet_user_info.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
+                        tweet_timestamp = format_date( new Date( retweet_user_info.retweeted_status.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
+                        jq_stream_item = $( self.retweet_timeinfo_template ),
+                        jq_timestamp = jq_stream_item.find( 'span._timestamp' ).css( {
+                            'font-size' : '14px',
+                            'margin-left' : '12px'
+                        } )
+                        .text( retweet_timestamp + ' (RT) / ' + tweet_timestamp + ' (Tweet)' );
+                    
+                    jq_stream_item.css( {
+                        'opacity' : '0.5'
+                    } )
+                    .find( 'div.js-stream-tweet' ).css( {
+                        'min-height' : 'auto'
+                    } );
+                    
+                    jq_stream_item.find( 'p.js-tweet-text' ).css( {
+                        'font-size' : '12px'
+                    } );
+                    
+                    jq_user.after( jq_stream_item );
+                    
+                    jq_stream_item_list.push( jq_stream_item );
+                }
+                
+                jq_referece_to_retweet_close_button.click( function ( event ) {
+                    jq_stream_item_list.forEach( function ( jq_stream_item ) {
+                        jq_stream_item.hide();
+                    } );
+                    
+                    jq_referece_to_retweet_close_button.parent().hide();
+                    jq_referece_to_retweet_open_button.parent().show();
+                    
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    return false;
+                } );
+                
+                jq_referece_to_retweet_open_button.click( function ( event ) {
+                    jq_stream_item_list.forEach( function ( jq_stream_item ) {
+                        jq_stream_item.show();
+                    } );
+                    
+                    jq_referece_to_retweet_open_button.parent().hide();
+                    jq_referece_to_retweet_close_button.parent().show();
+                    
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    return false;
+                } );
+                
+                jq_referece_to_retweet_close_button.parent().show();
+            } // end of complete()
+            
+            
+            function search() {
+                user_timeline.fetch_tweet_info( function ( result ) {
+                    if ( ( ! result ) || ( ! result.tweet_info ) ) {
+                        complete();
+                        return;
+                    }
+                    
+                    var tweet_info = result.tweet_info;
+                    
+                    log_error( tweet_info.tweet_screen_name, tweet_info.tweet_id, tweet_info.retweeter, tweet_info.retweet_id );
+                    
+                    if ( tweet_info.retweeter && bignum_cmp( tweet_info.retweet_id, retweet_id ) != 0 ) {
+                        
+                        if ( bignum_cmp( tweet_info.retweet_id, since_tweet_id ) <= 0 ) {
+                            complete();
+                            return;
+                        }
+                        search();
+                        return;
+                    }
+                    
+                    if ( bignum_cmp( ( tweet_info.retweet_id || tweet_info.tweet_id ), since_tweet_id ) <= 0 ) {
+                        complete();
+                        return;
+                    }
+                    
+                    var jq_stream_item = tweet_info.jq_stream_item;
+                    
+                    jq_stream_item.find( 'a.js-user-profile-link, div.ProfileTweet-action, div.js-media-container, div.stream-item-footer, div.QuoteTweet, div.Tombstone, div.AdaptiveMediaOuterContainer, button.js-translate-tweet, div.tweet-translation-container' )
+                    .addClass( SCRIPT_NAME + '-hidden' )
+                    .each( function () {
+                        this.style.cssText += 'display: none !important;';
+                    } );
+                    
+                    var jq_timestamp = jq_stream_item.find( 'span._timestamp' ),
+                        timestamp_ms = jq_timestamp.attr( 'data-time-ms' ),
+                        date = new Date( parseInt( timestamp_ms, 10 ) ),
+                        timestamp = format_date( date, 'YYYY/MM/DD hh:mm:ss');
+                    
+                    if ( tweet_info.retweeter ) {
+                        jq_stream_item.css( {
+                            'opacity' : '0.5'
+                        } )
+                        .find( 'div.js-stream-tweet' ).css( {
+                            'min-height' : 'auto'
+                        } );
+                        
+                        jq_timestamp.css( {
+                            'font-size' : '14px',
+                            'margin-left' : '12px'
+                        } )
+                        .text( format_date( get_date_from_tweet_id( tweet_info.retweet_id ), 'YYYY/MM/DD hh:mm:ss' ) + ' (RT) / ' + timestamp + ' (Tweet)' )
+                        .insertAfter( jq_stream_item.find( 'span.Icon--retweeted' ) );
+                        
+                        jq_stream_item.find( 'p.js-tweet-text' ).css( {
+                            'font-size' : '12px'
+                        } );
+                        jq_stream_item.find( 'span.js-retweet-text, div.stream-item-header' ).hide();
+                        
+                        function set_toggle( jq_stream_item ) {
+                            var jq_content = jq_stream_item.find( 'div.content:has(div.js-tweet-text-container)' )
+                                .hide(),
+                                is_hidden = true;
+                            
+                            jq_stream_item.click( function ( event ) {
+                                if ( is_hidden ) {
+                                    jq_content.show();
+                                }
+                                else {
+                                    jq_content.hide();
+                                }
+                                is_hidden = ! is_hidden;
+                                
+                                event.stopPropagation();
+                                event.preventDefault();
+                                
+                                return false;
+                            } );
+                            
+                        } // end of set_toggle()
+                        
+                        set_toggle( jq_stream_item );
+                    }
+                    else {
+                        jq_timestamp.text( timestamp );
+                        jq_stream_item.css( {
+                            'background' : ( is_night_mode() ) ? '#282828' : '#e8e8e8'
+                        } );
+                        jq_stream_item.find( 'p.js-tweet-text' ).css( {
+                            'font-size' : '14px'
+                        } );
+                    }
+                    
+                    jq_insert_point.after( jq_stream_item );
+                    jq_insert_point = jq_stream_item;
+                    
+                    jq_stream_item_list.push( jq_stream_item );
+                    
+                    search();
+                } );
+            } // end of search()
+            
+            search();
+            
+        } // end of __load_referece_to_retweet()
+    } ).init();
 
 
 function set_url_list_to_jq_link( jq_link, search_url_list ) {
@@ -762,9 +1793,16 @@ var get_jq_link_container = ( function () {
             'background-position : 0 0',
             'background-size : 24px 12px'
         ].join( ';\n' ) + '}\n' +
+        
         'a.' + SCRIPT_NAME + '_image:hover {' + [
             'background-position : -12px 0'
         ].join( ';\n' ) + '}\n'
+        
+        /*
+        '.' + SCRIPT_NAME + '-hidden {' + [
+            'display : none!important'
+        ].join( ';\n' ) + '}\n'
+        */
     );
     
     $( 'head' ).append( style );
@@ -786,7 +1824,11 @@ var get_jq_link_container = ( function () {
         }
         set_url_list_to_jq_link( jq_link , search_url_list );
         
-        jq_link.css( { 'font-size' : '12px' } );
+        jq_link.css( {
+            'font-size' : '12px',
+            'white-space' : 'nowrap'
+        } );
+        
         if ( css ) {
             jq_link.css( css );
         }
@@ -801,7 +1843,7 @@ var get_jq_link_container = ( function () {
                 jq_link.text( text );
             }
             jq_link.css( {
-                opacity : '0.8'
+                'opacity' : '0.8'
             } );
         }
         
@@ -833,7 +1875,7 @@ function start_search_tweet() {
         target_tweet_id = SEARCH_PARAMETERS.search_tweet_id || ( SEARCH_PARAMETERS.tweet_id_range && SEARCH_PARAMETERS.tweet_id_range.current_id ),
         reacted_tweet_id = SEARCH_PARAMETERS.reacted_tweet_id,
         search_time_sec = SEARCH_PARAMETERS.search_time_sec,
-        target_color = SEARCH_PARAMETERS.target_color,
+        target_color = ( is_night_mode() ) ? OPTIONS.TARGET_TWEET_COLOR_NIGHTMODE : OPTIONS.TARGET_TWEET_COLOR,
         
         last_tweet_id = null,
         jq_timeline = null,
@@ -841,11 +1883,11 @@ function start_search_tweet() {
         wait_counter = MAX_CHECK_RETRY,
         
         ua = w.navigator.userAgent.toLowerCase(),
-        animate_target_selector = ( ( ( ! w.chrome ) && ua.indexOf( 'webkit' ) != -1 ) || ( ua.indexOf( 'opr' ) != -1 ) || ( ua.indexOf( 'edge' ) != -1 ) ) ? 'body' : 'html',
+        animate_target_selector = ( ( ( ! w.chrome ) && ua.indexOf( 'webkit' ) != -1 ) || ( ua.indexOf( 'opr' ) != -1 ) || ( ua.indexOf( 'edge' ) != -1 ) ) ? 'body,html' : 'html',
         // [Javascript Chromeでページトップに戻る(scrollTop)が効かなくなってた件。 - かもメモ](http://chaika.hatenablog.com/entry/2017/09/22/090000)
         // ※ 2017/10現在 ($.fn.jquery = 3.1.1)
-        //   'html'<= Firefox, Chrome, Vivaldi, IE
-        //   'body'<= Safari, Opera, Edge
+        //   'html' ← Firefox, Chrome, Vivaldi, IE
+        //   'body' ← Safari, Opera, Edge
         animate_speed = 'fast'; //  'slow', 'normal', 'fast' またはミリ秒単位の数値
     
     
@@ -898,7 +1940,7 @@ function start_search_tweet() {
             // 目的ツイートが見つかった際の処理
             if ( jq_target_tweet.attr( 'data-retweet-id' ) == target_tweet_id ) {
                 retweet_found = true;
-                //target_color = OPTIONS.VICINITY_TWEET_COLOR;
+                //target_color = OPTIONS.VICINITY_TWEET_COLOR; // 目的ツイートが見つかった場合は"近傍ツイート"ではなく"対象ツイート"扱いのため、コメントアウト
             }
             log_debug( '*** Pattern A *** :', target_tweet_id, jq_target_tweet.attr( 'data-item-id' ) );
         }
@@ -910,7 +1952,6 @@ function start_search_tweet() {
             if ( $( '.empty-text' ).is( ':visible' ) ) {
                 // https://～/with_replies で「@～さんはまだツイートしていません。」が表示される場合、https://twitter.com/search の方へ移動
                 if ( search_timeline_url && ( search_timeline_url != current_search_url ) ) {
-                    //w.location.replace( search_timeline_url + '&_replaced=1' );
                     w.location.replace( search_timeline_url );
                 }
                 log_debug( '*** empty-text was found ***' );
@@ -988,7 +2029,7 @@ function start_search_tweet() {
                 return;
             }
             
-            target_color = OPTIONS.VICINITY_TWEET_COLOR;
+            target_color = ( is_night_mode() ) ? OPTIONS.VICINITY_TWEET_COLOR_NIGHTMODE : OPTIONS.VICINITY_TWEET_COLOR;
             log_debug( '*** Pattern B *** :', target_tweet_id, jq_target_tweet.attr( 'data-item-id' ) );
         }
         
@@ -1042,7 +2083,6 @@ function open_search_window( parameters ) {
         jq_link = parameters.jq_link,
         event = parameters.event,
         search_parameters = parameters.search_parameters,
-        target_color = parameters.target_color,
         child_window = parameters.child_window,
         search_url = jq_link.attr( 'href' ),
         search_url_shift = jq_link.attr( 'data-search-url-shift' ),
@@ -1053,12 +2093,6 @@ function open_search_window( parameters ) {
     }
     
     log_debug( 'open_search_window(): search_url =', search_url );
-    
-    if ( ! target_color ) {
-        target_color = OPTIONS.TARGET_TWEET_COLOR;
-    }
-    
-    search_parameters.target_color = target_color;
     
     if ( search_url == search_timeline_url ) {
         child_window = open_child_window( search_url, {
@@ -1099,31 +2133,14 @@ function open_search_window( parameters ) {
         //   幸い、↑の対策がなくても、現在ではタブで開いてくれるようになっている模様 ( Chrome, Firefox共に)
     }
     
-    $.getJSON( [ 'https://twitter.com/i/profiles/show/', search_parameters.screen_name, '/timeline/with_replies' ].join( '' ), {
-        'include_available_features' : '1',
-        'include_entities' : '1',
-        'oldest_unread_id' : '0',
-        'reset_error_state' : 'false',
-        'max_position': max_position
-    } )
-    .success( function ( json ) {
-        try {
-            var tweet_number = $( '<div/>' ).html( json.items_html ).find( '.js-stream-item' ).length;
-            
-            if ( tweet_number <= 0 ) {
-                log_debug( '*** target tweet was not found in user-timeline, then open search-timeline ***', search_parameters.screen_name, target_tweet_id, tweet_number, json.has_more_items );
-                search_url = search_timeline_url;
-            }
+    var user_timeline = object_extender( TemplateUserTimeline ).init( search_parameters.screen_name, target_tweet_id );
+    
+    user_timeline.fetch_tweet_info( function ( result ) {
+        if ( ( ! result ) || ( ! result.tweet_info ) ) {
+            log_debug( '*** target tweet was not found in user-timeline, then open search-timeline ***', search_parameters.screen_name, target_tweet_id );
+            search_url = search_timeline_url;
         }
-        catch( error ) {
-            log_error( '*** could not analyze json ***', error );
-        }
-    } )
-    .error( function ( jqXHR, textStatus, errorThrown ) {
-        log_error( '*** could not read timeline ***', textStatus );
-        search_url = search_timeline_url;
-    } )
-    .complete( function () {
+        
         child_window = open_child_window( search_url, {
             existing_window : child_window,
             search_parameters : search_parameters
@@ -1185,7 +2202,6 @@ function add_rtlink_to_tweet( jq_tweet, tweet_id ) {
             jq_link : jq_rtlink,
             event : event,
             search_parameters : search_parameters,
-            //target_color : OPTIONS.VICINITY_TWEET_COLOR,
             child_window : null
         } );
         
@@ -1252,6 +2268,81 @@ function add_link_to_quote_tweet( jq_item ) {
 } // end of add_link_to_quote_tweet()
 
 
+function add_recent_retweeets_button_to_tweet( jq_tweet ) {
+    var tweet_id = jq_tweet.attr( 'data-tweet-id' ),
+        jq_action_list = jq_tweet.find( '.ProfileTweet-actionList,footer' ),
+        jq_action_retweet = jq_action_list.find( '.ProfileTweet-action--retweet' ),
+        retweet_number;
+    
+    if ( ( ! tweet_id ) || ( jq_action_list.length <= 0 ) || ( jq_action_retweet.length <= 0 ) ) {
+        return;
+    }
+    
+    try {
+        retweet_number = parseInt( jq_action_retweet.find( '.ProfileTweet-actionCountForPresentation' ).text(), 10 );
+        if ( isNaN( retweet_number ) ) {
+            retweet_number = 0;
+        }
+    }
+    catch ( error ) {
+        retweet_number = 0;
+    }
+    
+    if ( retweet_number <= 0 ) {
+        return;
+    }
+    
+    var recent_retweet_users_button_class = SCRIPT_NAME + '-recent-retweets-button',
+        recent_retweet_users_button_template = [
+            '<div class="ProfileTweet-action">',
+            '  <div class="IconContainer js-tooltip" data-original-title="">',
+            '    <button class="btn"></button>',
+            '  </div>',
+            '</div>'
+        ].join( '\n' ),
+        
+        jq_recent_retweet_users_button_container = $( recent_retweet_users_button_template ).css( {
+            'min-width' : '54px'
+        } )
+        .addClass( recent_retweet_users_button_class ),
+        
+        jq_button_wrapper = jq_recent_retweet_users_button_container.find( 'div.IconContainer' ).css( {
+        } )
+        .attr( 'data-original-title', OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE ),
+        
+        jq_button = jq_button_wrapper.find( 'button.btn' ).css( {
+            'padding' : '4px 4px',
+            'font-size' : '11px',
+            //'background-image' : 'initial'
+            'background' : 'transparent'
+        } )
+        .text( OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT ),
+        
+        jq_action_retweet = jq_action_list.find( '.ProfileTweet-action--retweet' ),
+        jq_action_more = jq_action_list.find( '.ProfileTweet-action--more' );
+    
+    jq_action_list.find( '.' + recent_retweet_users_button_class ).remove();
+    
+    jq_recent_retweet_users_button_container.click( function ( event ) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        recent_retweet_users_dialog.open( tweet_id );
+        
+        return false;
+    } );
+    
+    jq_recent_retweet_users_button_container.css( {
+        'margin-left' : '4px'
+    } );
+    jq_action_retweet.css( {
+        'min-width' : '40px'
+    } );
+    jq_action_retweet.after( jq_recent_retweet_users_button_container );
+    
+} // end of add_recent_retweeets_button_to_tweet()
+
+
 function add_link_to_tweet( jq_tweet ) {
     var tweet_id = jq_tweet.attr( 'data-item-id' ),
         screen_name = jq_tweet.attr( 'data-screen-name' );
@@ -1290,7 +2381,6 @@ function add_link_to_tweet( jq_tweet ) {
             jq_link : jq_link,
             event : event,
             search_parameters : search_parameters,
-            target_color : null,
             child_window : null
         } );
         
@@ -1302,6 +2392,10 @@ function add_link_to_tweet( jq_tweet ) {
     add_rtlink_to_tweet( jq_tweet, tweet_id );
     
     add_link_to_quote_tweet( jq_tweet );
+    
+    if ( OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON && OAUTH2_ACCESS_TOKEN ) {
+        add_recent_retweeets_button_to_tweet( jq_tweet );
+    }
 } // end of add_link_to_tweet()
 
 
@@ -1314,7 +2408,7 @@ function add_link_to_activity( jq_activity ) {
     var jq_tweet = jq_activity.find( 'div.tweet:first' ),
         jq_quote_tweets = jq_activity.find( 'div.js-permalink[data-item-type="tweet"]'),
         tweet_id = ( 0 < jq_tweet.length ) ? jq_tweet.attr( 'data-item-id' ) : jq_quote_tweets.attr( 'data-item-id' ),
-        // TO: 引用ツイートは複数ある場合有り（暫定的に一つだけ）
+        // TO: 引用ツイートは複数ある場合有り→暫定的に Tweet ID はそのうちの一つだけを取得
         time_sec = parseInt( jq_timestamp.attr( 'data-time' ) ),
         min_sec = parseInt( jq_activity.attr( 'data-activity-min-position' ) ) / 1000,
         max_sec = parseInt( jq_activity.attr( 'data-activity-max-position' ) ) / 1000,
@@ -1357,7 +2451,6 @@ function add_link_to_activity( jq_activity ) {
                 jq_link : jq_link,
                 event : event,
                 search_parameters : search_parameters,
-                //target_color : OPTIONS.VICINITY_TWEET_COLOR,
                 child_window : null
             } );
             
@@ -1391,6 +2484,56 @@ function add_link_to_activity( jq_activity ) {
     add_link_to_quote_tweet( jq_activity );
 
 } // end of add_link_to_activity()
+
+
+function add_link_to_action_to_tweet( jq_action_to_tweet ) {
+    var jq_action_to_tweet_container = jq_action_to_tweet.parents(  SELECTOR_INFO.action_to_tweet_container_selector ),
+        retweeted_tweet_id = jq_action_to_tweet.attr( 'data-retweeted-tweet-id' ),
+        retweet_id = jq_action_to_tweet.attr( 'data-retweet-id' );
+    
+    if ( ( jq_action_to_tweet_container.length <= 0 ) || ( ! retweeted_tweet_id ) || ( ! retweet_id ) ) {
+        return;
+    }
+    
+    var action_screen_name = jq_action_to_tweet.attr( 'data-screen-name' ),
+        search_info = get_search_info( {
+            search_tweet_id : retweet_id,
+            reacted_tweet_id : retweeted_tweet_id,
+            tweet_id_range : null,
+            screen_name : action_screen_name,
+            max_id : null
+        } ),
+        search_url_list = search_info.search_url_list,
+        search_parameters = search_info.search_parameters,
+        result = get_jq_link_container( search_url_list, {
+            class_name : ACT_CONTAINER_CLASS,
+            title : OPTIONS.ACT_LINK_TITLE,
+            text : OPTIONS.ACT_LINK_TEXT,
+            css : {
+                'color' : OPTIONS.ACT_LINK_COLOR,
+                'padding' : '4px'
+            }
+        } ),
+        jq_link_container = result.container,
+        jq_link = result.link,
+        removed_number = jq_action_to_tweet.find( 'small.' + ACT_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応）
+    
+    log_debug( 'add_link_to_action_to_tweet(): action_screen_name:', action_screen_name, 'retweet_id:', retweet_id, 'retweeted_tweet_id:', retweeted_tweet_id, 'removed_number:', removed_number );
+    
+    set_click_handler( jq_link, function ( jq_link, event ) {
+        open_search_window( {
+            jq_link : jq_link,
+            event : event,
+            search_parameters : search_parameters,
+            child_window : null
+        } );
+        return false;
+    } );
+    
+    jq_action_to_tweet.find( 'a.js-user-profile-link:first' ).after( jq_link_container );
+    
+} // end of add_link_to_action_to_tweet()
+
 
 function hide_newer_tweet( jq_tweet, threshold_tweet_id ) {
     if ( ! threshold_tweet_id ) {
@@ -1538,9 +2681,19 @@ function check_changed_node( target_node ) {
         add_link_to_activity( jq_activity );
     } );
     
+    if ( OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON && OAUTH2_ACCESS_TOKEN ) {
+        ( ( jq_target.hasClasses( SELECTOR_INFO.action_to_tweet_class_names, true ) ) ? jq_target : jq_target.find( SELECTOR_INFO.action_to_tweet_selector ) )
+        .each( function () {
+            var jq_action_to_tweet = $( this );
+            
+            add_link_to_action_to_tweet( jq_action_to_tweet );
+        } );
+    }
+    
     hide_newer_tweet_container( jq_target, hide_threshold_tweet_id );
     
     check_back_to_top( jq_target );
+    
 } // end of check_changed_node()
 
 
@@ -1576,8 +2729,8 @@ function start_tweet_observer() {
     //        } );
     //    }
     //} );
-    // TODO: MutationObserver() で既存のリンクがあればそれをいったん削除して再挿入することで対処できるのではないかと様子見中
     */
+    // TODO: MutationObserver() で既存のリンクがあればそれをいったん削除して再挿入することで対処できるのではないかと様子見中
 } // end of start_tweet_observer()
 
 
@@ -1617,13 +2770,13 @@ function check_404_page() {
     
     jq_link_container.css( {
         'display' : 'inline-block',
-        //'background-color' : 'lightyellow'
-        'background-color' : 'inherit'
+        // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
+        'background-color' : 'inherit' // 'lightyellow' → 'inherit'
     } );
     
     jq_link.css( {
-        //'color' : '#0084b4',
-        'color' : 'inherit',
+        // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
+        'color' : 'inherit', // '#0084b4' → 'inherit'
         'font-size' : '16px',
         'font-weight' : 'bold'
     } );
@@ -1633,7 +2786,6 @@ function check_404_page() {
             jq_link : jq_link,
             event : event,
             search_parameters : search_parameters,
-            target_color : null,
             child_window : null
         } );
         
@@ -1699,13 +2851,94 @@ function initialize( user_options ) {
         return;
     }
     
-    check_changed_node( d.body );
     
-    start_tweet_observer();
+    function start_main() {
+        check_changed_node( d.body );
+        start_tweet_observer();
+        start_search_tweet();
+        
+        log_debug( 'All set.' );
+    } // end of start_main()
     
-    start_search_tweet();
     
-    log_debug( 'All set.' );
+    if ( ! OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON ) {
+        start_main();
+        return;
+    }
+    
+    
+    function get_access_token() {
+        OAUTH2_ACCESS_TOKEN = null;
+        set_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN', '' );
+        
+        $.ajax( {
+            type : 'POST',
+            url : OAUTH2_TOKEN_API_URL,
+            headers : {
+                'Authorization' : 'Basic '+ ENCODED_TOKEN_CREDENTIAL
+            ,   'Content-Type' : 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            data : {
+                'grant_type' : 'client_credentials'
+            },
+            dataType : 'json',
+            xhrFields : {
+                withCredentials : false // Cross-Origin Resource Sharing(CORS)用設定
+                // TODO: Chrome 拡張機能だと false であっても Cookie が送信されてしまう
+                // → webRequest を有効にして、background.js でリクエストヘッダから Cookie を取り除くようにして対応
+                // → webRequest を無効にしていても、Cookie が送信されなくなったので、元に戻す
+            }
+        } )
+        .success( function ( json ) {
+            OAUTH2_ACCESS_TOKEN = json.access_token;
+            if ( OPTIONS.CACHE_OAUTH2_ACCESS_TOKEN ) {
+                set_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN', OAUTH2_ACCESS_TOKEN );
+            }
+        } )
+        .error( function ( jqXHR, textStatus, errorThrown ) {
+            log_error( OAUTH2_TOKEN_API_URL, textStatus );
+            // TODO: Cookies 中に auth_token が含まれていると、403 (code:99)が返ってきてしまう
+            // → auth_token は Twitter ログイン中保持されるため、Cookies を送らないようにする対策が取れない場合、対応は困難
+            OAUTH2_ACCESS_TOKEN = null;
+            set_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN', '' );
+        } )
+        .complete( function () {
+            start_main();
+        } );
+    } // end of get_access_token()
+    
+    
+    OAUTH2_ACCESS_TOKEN = ( OPTIONS.CACHE_OAUTH2_ACCESS_TOKEN ) ? get_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN' ) : null;
+    
+    if ( OAUTH2_ACCESS_TOKEN ) {
+        $.ajax( {
+            type : 'GET',
+            url : API_RATE_LIMIT_STATUS,
+            data : {
+                'resources' : 'statuses'
+            },
+            dataType : 'json',
+            headers : {
+                'Authorization' : 'Bearer ' + OAUTH2_ACCESS_TOKEN
+            }
+        } )
+        .success( function ( json ) {
+            if ( ( ! json ) || ( ! json.rate_limit_context ) || ( ! json.resources ) || ( ! json.resources.statuses ) ) {
+                get_access_token();
+                return;
+            }
+            start_main();
+        } )
+        .error( function ( jqXHR, textStatus, errorThrown ) {
+            log_error( API_RATE_LIMIT_STATUS, textStatus );
+            get_access_token();
+        } )
+        .complete( function () {
+        } );
+    }
+    else {
+        get_access_token();
+    }
 
 } // end of initialize()
 
