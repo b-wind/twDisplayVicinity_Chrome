@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.1
+// @version         0.2.6.2
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -172,6 +172,12 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = '開く';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = '全ユーザーについて、リツイート前後のツイートを取得';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT = 'まとめて ↓↑';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE = '全て閉じる';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT = '全て↑';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = '全て開く';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = '全て↓';
         break;
     default:
         OPTIONS.LINK_TEXT = 'vicinity';
@@ -180,7 +186,7 @@ switch ( LANGUAGE ) {
         OPTIONS.ACT_LINK_TITLE = 'search vicinity tweets around action';
         OPTIONS.GO_TO_PAST_TEXT = 'Go to past ↓';
         OPTIONS.CLOSE_TEXT = 'Close';
-        OPTIONS.RECENT_RETWEET_USERS_TEXT = 'Recent Retweet Users';
+        OPTIONS.RECENT_RETWEET_USERS_TEXT = 'Recent Retweeters';
         OPTIONS.LOADING_TEXT = 'Loading...';
         OPTIONS.LOADING_ERROR_TEXT = 'Load error';
         OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE = 'Display recent users that have retweeted';
@@ -191,6 +197,12 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = 'Open';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = 'Retrieve Tweets around this Retweet (All users)';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT = 'All ↓↑';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE = 'Close All';
+        OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT = 'All ↑';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = 'Open All';
+        OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = 'All ↓';
         break;
 }
 
@@ -214,6 +226,10 @@ var SEARCH_API = 'https://twitter.com/search',
     WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
     LIMIT_STATUSES_RETWEETS_USER_NUMBER = 100, // statuses/retweets のユーザー数制限
     DEFAULT_STATUSES_RETWEETS_USER_NUMBER = 30, // statuses/retweets のデフォルトユーザー数
+    LIMIT_MAX_AFTER_RETWEET_MINUTES = 60, // リツイート後のツイート取得時間(分)制限
+    DEFAULT_MAX_AFTER_RETWEET_MINUTES = 10, // リツイート後のツイート取得時間(分)デフォルト
+    LIMIT_MAX_BEFORE_RETWEET_MINUTES = 60, // リツイート前のツイート取得時間(分)制限
+    DEFAULT_MAX_BEFORE_RETWEET_MINUTES = 10, // リツイート前のツイート取得時間(分)デフォルト
     
     ID_INC_PER_MSEC = Decimal.pow( 2, 22 ), // ミリ秒毎のID増分
     ID_INC_PER_SEC = ID_INC_PER_MSEC.mul( 1000 ), // 秒毎のID増分
@@ -376,9 +392,11 @@ var get_value = ( function () {
 
 var object_extender = ( function () {
     function object_extender( base_object ) {
-        var template = object_extender.template,
-            base_object = template.prototype = base_object,
-            expanded_object = new template(),
+        var template = object_extender.template;
+        
+        template.prototype = base_object;
+        
+        var expanded_object = new template(),
             object_list = to_array( arguments );
         
         object_list.shift();
@@ -406,7 +424,7 @@ $.fn.hasClasses = function( selector, or_flag ) {
     
     if ( typeof selector === 'string' ) {
         selector = selector.trim();
-        class_names = ( selector.match( /^\./ ) ) ? selector.replace( /^\./, '' ).split( '.' ) : selector.split( ' ' )
+        class_names = ( selector.match( /^\./ ) ) ? selector.replace( /^\./, '' ).split( '.' ) : selector.split( ' ' );
     }
     else {
         class_names = selector;
@@ -444,7 +462,9 @@ function format_date( date, format, flag_utc ) {
             .replace( /hh/g, ( '0' + date.getUTCHours() ).slice( -2 ) )
             .replace( /mm/g, ( '0' + date.getUTCMinutes() ).slice( -2 ) )
             .replace( /ss/g, ( '0' + date.getUTCSeconds() ).slice( -2 ) )
-            .replace( /S/g, function ( all ) { return msec.charAt( msec_index ++ ) } );
+            .replace( /S/g, function ( all ) {
+                return msec.charAt( msec_index ++ );
+            } );
     }
     else {
         format = format
@@ -454,7 +474,9 @@ function format_date( date, format, flag_utc ) {
             .replace( /hh/g, ( '0' + date.getHours() ).slice( -2 ) )
             .replace( /mm/g, ( '0' + date.getMinutes() ).slice( -2 ) )
             .replace( /ss/g, ( '0' + date.getSeconds() ).slice( -2 ) )
-            .replace( /S/g, function ( all ) { return msec.charAt( msec_index ++ ) } );
+            .replace( /S/g, function ( all ) {
+                return msec.charAt( msec_index ++ );
+            } );
     }
     
     return format;
@@ -540,14 +562,14 @@ function tweet_id_shift( tweet_id, offset_sec ) {
 function get_gmt_date( time_sec ) {
     var date = new Date( 1000 * time_sec );
     
-    return format_date( date, 'YYYY-MM-DD', true )
+    return format_date( date, 'YYYY-MM-DD', true );
 } // end of get_gmt_date()
 
 
 function get_gmt_datetime( time_sec ) {
     var date = new Date( 1000 * time_sec );
     
-    return format_date( date, 'YYYY-MM-DD_hh:mm:ss_GMT', true )
+    return format_date( date, 'YYYY-MM-DD_hh:mm:ss_GMT', true );
 } // end of get_gmt_datetime()
 
 
@@ -639,8 +661,9 @@ function parse_individual_tweet_url( tweet_url ) {
 
 
 function get_search_info( parameters ) {
-    var parameters = ( parameters ) ? parameters : {},
-        screen_name = parameters.screen_name,
+    parameters = ( parameters ) ? parameters : {};
+    
+    var screen_name = parameters.screen_name,
         search_tweet_id = parameters.search_tweet_id,
         reacted_tweet_id = parameters.reacted_tweet_id,
         tweet_id_range = parameters.tweet_id_range,
@@ -679,10 +702,8 @@ function get_search_info( parameters ) {
     
     if ( ! query ) {
         if ( search_time_sec ) {
-            //since = get_gmt_date( search_time_sec - ( 3600 * 24 * OPTIONS.DAY_BEFORE ) ),
-            //until = get_gmt_date( search_time_sec + ( 3600 * 24 * ( 1 + OPTIONS.DAY_AFTER ) ) );
-            since = get_gmt_datetime( search_time_sec - ( OPTIONS.HOUR_BEFORE * 3600 ) ),
-            until = get_gmt_datetime( search_time_sec + ( ( 1 + OPTIONS.HOUR_AFTER * 3600 ) ) );
+            since = get_gmt_datetime( ( search_time_sec - ( OPTIONS.HOUR_BEFORE * 3600 ) ) );
+            until = get_gmt_datetime( ( search_time_sec + ( OPTIONS.HOUR_AFTER * 3600 + 1 ) ) );
             
             if ( OPTIONS.IGNORE_SINCE ) {
                 query = 'from:' + screen_name + ' until:' + until;
@@ -898,8 +919,8 @@ var TemplateUserTimeline = {
                 if ( bignum_cmp( self.current_min_id, check_tweet_id ) <= 0 ) {
                     if ( self.timeline_status == 'stop' ) {
                         callback( {
-                            tweet_info : null
-                        ,   timeline_status : self.timeline_status
+                            tweet_info : null,
+                            timeline_status : self.timeline_status
                         } );
                         return self;
                     }
@@ -909,8 +930,8 @@ var TemplateUserTimeline = {
                 self.current_min_id = check_tweet_id;
                 
                 callback( {
-                    tweet_info : tweet_info
-                ,   timeline_status : self.timeline_status
+                    tweet_info : tweet_info,
+                    timeline_status : self.timeline_status
                 } );
                 
                 return self;
@@ -923,12 +944,10 @@ var TemplateUserTimeline = {
                     } );
                     break;
                 
-                case 'stop' :
-                case 'error' :
-                default :
+                default : // 'stop' / 'error' etc.
                     callback( {
-                        tweet_info : tweet_info
-                    ,   timeline_status : self.timeline_status
+                        tweet_info : tweet_info,
+                        timeline_status : self.timeline_status
                     } );
                     break;
             }
@@ -1079,19 +1098,25 @@ var recent_retweet_users_dialog = object_extender( {
             '      </div>',
             '    </div>',
             '    <div class="IconContainer js-tooltip load" data-original-title="">',
-            '      <button class="btn">↓↑</button>',
+            '      <button class="btn"></button>',
             '    </div>',
             '    <div class="IconContainer js-tooltip close" data-original-title="">',
-            '      <button class="btn">↑</button>',
+            '      <button class="btn"></button>',
             '    </div>',
             '    <div class="IconContainer js-tooltip open" data-original-title="">',
-            '      <button class="btn">↓</button>',
+            '      <button class="btn"></button>',
             '    </div>',
             '    <div class="loading">',
             '      <span class="spinner-bigger"></span>',
             '    </div>',
             '  </div>',
             '</li>'
+        ].join( '\n' ),
+        
+        reference_to_retweet_button_template: [
+            '    <div class="IconContainer js-tooltip" data-original-title="">',
+            '      <button class="btn"></button>',
+            '    </div>'
         ].join( '\n' ),
         
         retweet_timeinfo_template : [
@@ -1155,7 +1180,7 @@ var recent_retweet_users_dialog = object_extender( {
                 
                 jq_header_container = self.jq_header_container = jq_dialog.find( '.' + SCRIPT_NAME + '-header-container' ).css( {
                     'width' : '100%',
-                    'height' : '30px',
+                    'height' : '50px',
                     'position' : 'relative',
                     'margin' : '0 0 0 0',
                     'padding' : '0 0 0 0'
@@ -1165,7 +1190,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'width' : '100%',
                     'height' : '100%',
                     'text-align' : 'center',
-                    'padding-top' : '2px'
+                    'padding-top' : '14px'
                 } ),
                 
                 jq_close = self.jq_close = jq_header_container.find( '.' + SCRIPT_NAME + '-button-close' ).css( {
@@ -1221,6 +1246,7 @@ var recent_retweet_users_dialog = object_extender( {
             var self = this,
                 jq_dialog_container = self.jq_dialog_container,
                 jq_dialog = self.jq_dialog,
+                jq_header_container = self.jq_header_container,
                 jq_title = self.jq_title,
                 jq_loading = self.jq_loading,
                 jq_user_list = self.jq_user_list;
@@ -1267,6 +1293,7 @@ var recent_retweet_users_dialog = object_extender( {
             //} );
             */
             
+            jq_header_container.find( 'div.IconContainer' ).remove();
             jq_user_list.empty();
             jq_title.text( OPTIONS.LOADING_TEXT );
             jq_loading.show();
@@ -1278,7 +1305,7 @@ var recent_retweet_users_dialog = object_extender( {
                     jq_loading.hide();
                     
                     if ( result_message != 'ignore' ) {
-                        jq_title.text( OPTIONS.LOADING_ERROR_TEXT  );
+                        jq_title.text( OPTIONS.LOADING_ERROR_TEXT );
                     }
                     return;
                 }
@@ -1327,9 +1354,110 @@ var recent_retweet_users_dialog = object_extender( {
                     
                     self.jq_user_list.append( jq_spacer );
                     
-                    jq_loading.hide();
-                    
                     jq_title.text( OPTIONS.RECENT_RETWEET_USERS_TEXT );
+                    
+                    var jq_load_all_button_wrapper = $( self.reference_to_retweet_button_template ).css( {
+                            'position' : 'absolute',
+                            'bottom' : '8px',
+                            'right' : '24px'
+                        } )
+                        .addClass( 'all-load' )
+                        .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE ),
+                        
+                        jq_load_all_button = jq_load_all_button_wrapper.find( 'button.btn' ).css( {
+                            'font-size' : '14px',
+                            'padding' : '6px 8px',
+                            'cursor' : 'pointer'
+                        } )
+                        .text( OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT )
+                        .click( function ( event ) {
+                            self.jq_user_list.find( 'div.IconContainer.load button.btn' ).each( function () {
+                                var jq_load_button = $( this );
+                                
+                                if ( jq_load_button.is( ':hidden' ) ) {
+                                    return;
+                                }
+                                jq_load_button.click();
+                            } );
+                            
+                            jq_load_all_button_wrapper.remove();
+                            jq_close_all_button_wrapper.show();
+                            jq_open_all_button_wrapper.show();
+                            
+                            event.stopPropagation();
+                            event.preventDefault();
+                            
+                            return false;
+                        } ),
+                        
+                        jq_close_all_button_wrapper = $( self.reference_to_retweet_button_template ).css( {
+                            'position' : 'absolute',
+                            'bottom' : '8px',
+                            'right' : '24px'
+                        } )
+                        .addClass( 'all-close' )
+                        .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE )
+                        .hide(),
+                        
+                        jq_close_all_button = jq_close_all_button_wrapper.find( 'button.btn' ).css( {
+                            'font-size' : '12px',
+                            'padding' : '6px 8px',
+                            'cursor' : 'pointer'
+                        } )
+                        .text( OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT )
+                        .click( function ( event ) {
+                            self.jq_user_list.find( 'div.IconContainer.close button.btn' ).each( function () {
+                                var jq_close_button = $( this );
+                                
+                                if ( jq_close_button.is( ':hidden' ) ) {
+                                    return;
+                                }
+                                jq_close_button.click();
+                            } );
+                            
+                            event.stopPropagation();
+                            event.preventDefault();
+                            
+                            return false;
+                        } ),
+                        
+                        jq_open_all_button_wrapper = $( self.reference_to_retweet_button_template ).css( {
+                            'position' : 'absolute',
+                            'bottom' : '8px',
+                            'right' : '84px'
+                        } )
+                        .addClass( 'all-open' )
+                        .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE )
+                        .hide(),
+                        
+                        jq_open_all_button = jq_open_all_button_wrapper.find( 'button.btn' ).css( {
+                            'font-size' : '12px',
+                            'padding' : '6px 8px',
+                            'cursor' : 'pointer'
+                        } )
+                        .text( OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT )
+                        .click( function ( event ) {
+                            self.jq_user_list.find( 'div.IconContainer.open button.btn' ).each( function () {
+                                var jq_open_button = $( this );
+                                
+                                if ( jq_open_button.is( ':hidden' ) ) {
+                                    return;
+                                }
+                                jq_open_button.click();
+                            } );
+                            
+                            event.stopPropagation();
+                            event.preventDefault();
+                            
+                            return false;
+                        } );
+                    
+                    self.jq_header_container
+                    .append( jq_load_all_button_wrapper )
+                    .append( jq_close_all_button_wrapper )
+                    .append( jq_open_all_button_wrapper );
+                    
+                    jq_loading.hide();
                 } // end of check_complete()
                 
                 
@@ -1441,6 +1569,34 @@ var recent_retweet_users_dialog = object_extender( {
             
             return max_user_number;
         }, // end of __get_max_user_number()
+        
+        
+        __get_max_after_retweet_minutes : function () {
+            if ( ( ! OPTIONS.MAX_AFTER_RETWEET_MINUTES ) || isNaN( OPTIONS.MAX_AFTER_RETWEET_MINUTES ) ) {
+                return DEFAULT_MAX_AFTER_RETWEET_MINUTES;
+            }
+            var max_after_retweet_minutes = parseInt( OPTIONS.MAX_AFTER_RETWEET_MINUTES, 10 );
+            
+            if ( ( max_after_retweet_minutes < 1 ) || ( LIMIT_MAX_AFTER_RETWEET_MINUTES < max_after_retweet_minutes ) ) {
+                return DEFAULT_MAX_AFTER_RETWEET_MINUTES;
+            }
+            
+            return max_after_retweet_minutes;
+        }, // end of __get_max_after_retweet_minutes()
+        
+        
+        __get_max_before_retweet_minutes : function () {
+            if ( ( ! OPTIONS.MAX_BEFORE_RETWEET_MINUTES ) || isNaN( OPTIONS.MAX_BEFORE_RETWEET_MINUTES ) ) {
+                return DEFAULT_MAX_BEFORE_RETWEET_MINUTES;
+            }
+            var max_before_retweet_minutes = parseInt( OPTIONS.MAX_BEFORE_RETWEET_MINUTES, 10 );
+            
+            if ( ( max_before_retweet_minutes < 1 ) || ( LIMIT_MAX_BEFORE_RETWEET_MINUTES < max_before_retweet_minutes ) ) {
+                return DEFAULT_MAX_BEFORE_RETWEET_MINUTES;
+            }
+            
+            return max_before_retweet_minutes;
+        }, // end of __get_max_before_retweet_minutes()
         
         
         __insert_user : function ( retweeted_tweet_id, retweet_user_info ) {
@@ -1564,10 +1720,10 @@ var recent_retweet_users_dialog = object_extender( {
         __load_referece_to_retweet : function ( retweet_id, user, jq_user,  jq_referece_to_retweet_load_button, jq_referece_to_retweet_loading, jq_referece_to_retweet_close_button, jq_referece_to_retweet_open_button ) {
             var self = this,
                 screen_name = user.screen_name,
-                until_tweet_id = tweet_id_shift( retweet_id, 60 * OPTIONS.MAX_AFTER_RETWEET_MINUTES ),
-                since_tweet_id = tweet_id_shift( retweet_id, -( 60 * OPTIONS.MAX_BEFORE_RETWEET_MINUTES ) );
+                until_tweet_id = tweet_id_shift( retweet_id, 60 * self.__get_max_after_retweet_minutes() ),
+                since_tweet_id = tweet_id_shift( retweet_id, -( 60 * self.__get_max_before_retweet_minutes() ) );
             
-            jq_referece_to_retweet_load_button.parent().hide();
+            jq_referece_to_retweet_load_button.parent().remove();
             jq_referece_to_retweet_loading.show();
             
             if ( ! until_tweet_id ) {
@@ -1650,6 +1806,54 @@ var recent_retweet_users_dialog = object_extender( {
             } // end of complete()
             
             
+            function set_toggle_retweet_content_visible( jq_stream_item ) {
+                var jq_content = jq_stream_item.find( 'div.content:has(div.js-tweet-text-container)' )
+                    .hide(),
+                    is_hidden = true;
+                
+                jq_stream_item.click( function ( event ) {
+                    if ( is_hidden ) {
+                        jq_content.show();
+                    }
+                    else {
+                        jq_content.hide();
+                    }
+                    is_hidden = ! is_hidden;
+                    
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    return false;
+                } );
+                
+            } // end of set_toggle_retweet_content_visible()
+            
+            
+            function set_neighboring_tweet_event( jq_stream_item ) {
+                jq_stream_item.click( function ( event ) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    return false;
+                } );
+                
+                // TODO: リンクをどうするか？（そのままではクリックするとダイアログの裏で遷移したいりする）
+                // →とりあえず、別タブで開く
+                jq_stream_item.find( 'a[href]' ).click( function ( event ) {
+                    var url = $( this ).attr( 'href' );
+                    
+                    if ( /^(?:\/|https?:\/\/)/.test( url ) ) {
+                        open_child_window( url );
+                    }
+                    
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    return false;
+                } );
+            } // end of set_neighboring_tweet_event()
+            
+            
             function search() {
                 user_timeline.fetch_tweet_info( function ( result ) {
                     if ( ( ! result ) || ( ! result.tweet_info ) ) {
@@ -1659,9 +1863,7 @@ var recent_retweet_users_dialog = object_extender( {
                     
                     var tweet_info = result.tweet_info;
                     
-                    log_error( tweet_info.tweet_screen_name, tweet_info.tweet_id, tweet_info.retweeter, tweet_info.retweet_id );
-                    
-                    if ( tweet_info.retweeter && bignum_cmp( tweet_info.retweet_id, retweet_id ) != 0 ) {
+                    if ( tweet_info.retweeter && bignum_cmp( tweet_info.retweet_id, retweet_id ) !== 0 ) {
                         
                         if ( bignum_cmp( tweet_info.retweet_id, since_tweet_id ) <= 0 ) {
                             complete();
@@ -1683,6 +1885,12 @@ var recent_retweet_users_dialog = object_extender( {
                     .each( function () {
                         this.style.cssText += 'display: none !important;';
                     } );
+                    
+                    // TODO: リプライを検索対象として含めるか？
+                    jq_stream_item.find( 'div.ReplyingToContextBelowAuthor a.js-user-profile-link' ).css( {
+                        'display' : ''
+                    } )
+                    .removeClass( SCRIPT_NAME + '-hidden' );
                     
                     var jq_timestamp = jq_stream_item.find( 'span._timestamp' ),
                         timestamp_ms = jq_timestamp.attr( 'data-time-ms' ),
@@ -1709,29 +1917,7 @@ var recent_retweet_users_dialog = object_extender( {
                         } );
                         jq_stream_item.find( 'span.js-retweet-text, div.stream-item-header' ).hide();
                         
-                        function set_toggle( jq_stream_item ) {
-                            var jq_content = jq_stream_item.find( 'div.content:has(div.js-tweet-text-container)' )
-                                .hide(),
-                                is_hidden = true;
-                            
-                            jq_stream_item.click( function ( event ) {
-                                if ( is_hidden ) {
-                                    jq_content.show();
-                                }
-                                else {
-                                    jq_content.hide();
-                                }
-                                is_hidden = ! is_hidden;
-                                
-                                event.stopPropagation();
-                                event.preventDefault();
-                                
-                                return false;
-                            } );
-                            
-                        } // end of set_toggle()
-                        
-                        set_toggle( jq_stream_item );
+                        set_toggle_retweet_content_visible( jq_stream_item );
                     }
                     else {
                         jq_timestamp.text( timestamp );
@@ -1741,6 +1927,8 @@ var recent_retweet_users_dialog = object_extender( {
                         jq_stream_item.find( 'p.js-tweet-text' ).css( {
                             'font-size' : '14px'
                         } );
+                        
+                        set_neighboring_tweet_event( jq_stream_item );
                     }
                     
                     jq_insert_point.after( jq_stream_item );
@@ -1797,19 +1985,14 @@ var get_jq_link_container = ( function () {
         'a.' + SCRIPT_NAME + '_image:hover {' + [
             'background-position : -12px 0'
         ].join( ';\n' ) + '}\n'
-        
-        /*
-        '.' + SCRIPT_NAME + '-hidden {' + [
-            'display : none!important'
-        ].join( ';\n' ) + '}\n'
-        */
     );
     
     $( 'head' ).append( style );
     
     return function ( search_url_list, options ) {
-        var options = ( options ) ? options : {},
-            class_name = options.class_name,
+        options = ( options ) ? options : {};
+        
+        var class_name = options.class_name,
             title = options.title,
             text = options.text,
             css = options.css,
@@ -1854,7 +2037,7 @@ var get_jq_link_container = ( function () {
 
 function get_search_timeline_url( search_url_list ) {
     var filtered_url_list = search_url_list.filter( function ( search_url ) {
-            return ( search_url && ( search_url.indexOf( SEARCH_API, 0 ) == 0 ) );
+            return ( search_url && ( search_url.indexOf( SEARCH_API, 0 ) === 0 ) );
         } );
     
     if ( filtered_url_list.length <= 0 ) {
@@ -2079,8 +2262,9 @@ function start_search_tweet() {
 
 
 function open_search_window( parameters ) {
-    var parameters = ( parameters ) ? parameters : {},
-        jq_link = parameters.jq_link,
+    parameters = ( parameters ) ? parameters : {};
+    
+    var jq_link = parameters.jq_link,
         event = parameters.event,
         search_parameters = parameters.search_parameters,
         child_window = parameters.child_window,
@@ -2218,6 +2402,47 @@ function add_rtlink_to_tweet( jq_tweet, tweet_id ) {
 } // end of add_rtlink_to_tweet()
 
 
+function create_recent_retweet_users_button( tweet_id ) {
+    var recent_retweet_users_button_class = SCRIPT_NAME + '-recent-retweets-button',
+        recent_retweet_users_button_template = [
+            '<div class="ProfileTweet-action">',
+            '  <div class="IconContainer js-tooltip" data-original-title="">',
+            '    <button class="btn"></button>',
+            '  </div>',
+            '</div>'
+        ].join( '\n' ),
+        
+        jq_recent_retweet_users_button_container = $( recent_retweet_users_button_template ).css( {
+            'min-width' : '54px'
+        } )
+        .addClass( recent_retweet_users_button_class ),
+        
+        jq_button_wrapper = jq_recent_retweet_users_button_container.find( 'div.IconContainer' ).css( {
+        } )
+        .attr( 'data-original-title', OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE ),
+        
+        jq_button = jq_button_wrapper.find( 'button.btn' ).css( {
+            'padding' : '4px 4px',
+            'font-size' : '11px',
+            //'background-image' : 'initial'
+            'background' : 'transparent'
+        } )
+        .text( OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT );
+    
+    jq_recent_retweet_users_button_container.click( function ( event ) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        recent_retweet_users_dialog.open( tweet_id );
+        
+        return false;
+    } );
+    
+    return jq_recent_retweet_users_button_container;
+
+} // end of create_recent_retweet_users_button()
+
+
 function add_link_to_quote_tweet( jq_item ) {
     var jq_quote_tweets = jq_item.find( 'div.QuoteTweet div.js-permalink[data-item-type="tweet"]');
     
@@ -2264,6 +2489,21 @@ function add_link_to_quote_tweet( jq_item ) {
         } );
         
         jq_user_name.after( jq_link_container );
+        
+        if ( OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON && OAUTH2_ACCESS_TOKEN ) {
+            if ( jq_quote_tweet.parents( 'div[data-activity-type="retweet"], li[data-component-context="retweet_activity"]' ).length <= 0 ) {
+                return;
+            }
+            
+            var recent_retweet_users_button_class = SCRIPT_NAME + '-recent-retweets-button',
+                jq_recent_retweet_users_button_container = create_recent_retweet_users_button( tweet_id ).css( {
+                    'margin-left' : '12px'
+                } );
+            
+            jq_quote_tweet.find( '.' + recent_retweet_users_button_class ).remove();
+            
+            jq_user_name.after( jq_recent_retweet_users_button_container );
+        }
     } );
 } // end of add_link_to_quote_tweet()
 
@@ -2293,53 +2533,20 @@ function add_recent_retweeets_button_to_tweet( jq_tweet ) {
     }
     
     var recent_retweet_users_button_class = SCRIPT_NAME + '-recent-retweets-button',
-        recent_retweet_users_button_template = [
-            '<div class="ProfileTweet-action">',
-            '  <div class="IconContainer js-tooltip" data-original-title="">',
-            '    <button class="btn"></button>',
-            '  </div>',
-            '</div>'
-        ].join( '\n' ),
-        
-        jq_recent_retweet_users_button_container = $( recent_retweet_users_button_template ).css( {
-            'min-width' : '54px'
-        } )
-        .addClass( recent_retweet_users_button_class ),
-        
-        jq_button_wrapper = jq_recent_retweet_users_button_container.find( 'div.IconContainer' ).css( {
-        } )
-        .attr( 'data-original-title', OPTIONS.RECENT_RETWEET_USERS_BUTTON_TITLE ),
-        
-        jq_button = jq_button_wrapper.find( 'button.btn' ).css( {
-            'padding' : '4px 4px',
-            'font-size' : '11px',
-            //'background-image' : 'initial'
-            'background' : 'transparent'
-        } )
-        .text( OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT ),
-        
-        jq_action_retweet = jq_action_list.find( '.ProfileTweet-action--retweet' ),
-        jq_action_more = jq_action_list.find( '.ProfileTweet-action--more' );
+        jq_recent_retweet_users_button_container = create_recent_retweet_users_button( tweet_id );
     
     jq_action_list.find( '.' + recent_retweet_users_button_class ).remove();
-    
-    jq_recent_retweet_users_button_container.click( function ( event ) {
-        event.stopPropagation();
-        event.preventDefault();
-        
-        recent_retweet_users_dialog.open( tweet_id );
-        
-        return false;
-    } );
     
     jq_recent_retweet_users_button_container.css( {
         'margin-left' : '4px'
     } );
+    
     jq_action_retweet.css( {
         'min-width' : '40px'
     } );
-    jq_action_retweet.after( jq_recent_retweet_users_button_container );
     
+    jq_action_retweet.after( jq_recent_retweet_users_button_container );
+
 } // end of add_recent_retweeets_button_to_tweet()
 
 
@@ -2875,8 +3082,8 @@ function initialize( user_options ) {
             type : 'POST',
             url : OAUTH2_TOKEN_API_URL,
             headers : {
-                'Authorization' : 'Basic '+ ENCODED_TOKEN_CREDENTIAL
-            ,   'Content-Type' : 'application/x-www-form-urlencoded;charset=UTF-8'
+                'Authorization' : 'Basic '+ ENCODED_TOKEN_CREDENTIAL,
+                'Content-Type' : 'application/x-www-form-urlencoded;charset=UTF-8'
             },
             data : {
                 'grant_type' : 'client_credentials'

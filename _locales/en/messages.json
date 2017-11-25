@@ -23,6 +23,9 @@
 , "HOURS" : {
     "message": "hours"
   }
+, "MINUTES" : {
+    "message" : "minutes"
+  }
 , "HOUR_AFTER" : {
     "message": "Maximum hours after the particular tweet"
   }
@@ -66,10 +69,19 @@
     "message": "Link Icons"
   }
 , "ENABLE_RECENT_RETWEET_USERS_BUTTON_HEADER" : {
-    "message" : "Buttons to display recent users that have retweeted"
+    "message" : "Buttons to display recent retweeters"
   }
 , "MAX_USER_NUMBER_HEADER" : {
-    "message" : "Max user number (limit:100)"
+    "message" : "Max user number (&#8806;100)"
+  }
+, "SEARCH_TWEET_RANGE_HEADER" : {
+    "message" : "Search Tweet range"
+  }
+, "RANGE_BEFORE_RT" : {
+    "message" : "before RT (&#8806;60)"
+  }
+, "RANGE_AFTER_RT" : {
+    "message" : "after RT (&#8806;60)"
   }
 , "ENABLED" : {
     "message": "enabled"

@@ -23,6 +23,9 @@
 , "HOURS" : {
     "message": "時間"
   }
+, "MINUTES" : {
+    "message" : "分"
+  }
 , "HOUR_AFTER" : {
     "message": "特定ツイート後のタイムライン表示範囲(時間)"
   }
@@ -70,6 +73,15 @@
   }
 , "MAX_USER_NUMBER_HEADER" : {
     "message" : "取得ユーザー数 (最大:100)"
+  }
+, "SEARCH_TWEET_RANGE_HEADER" : {
+    "message" : "検索 Tweet 範囲"
+  }
+, "RANGE_BEFORE_RT" : {
+    "message" : "RT前（≦60）"
+  }
+, "RANGE_AFTER_RT" : {
+    "message" : "RT後（≦60）"
   }
 , "ENABLED" : {
     "message": "有効"
