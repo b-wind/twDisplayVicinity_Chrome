@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.3
+// @version         0.2.6.4
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -233,11 +233,17 @@ var SEARCH_API = 'https://twitter.com/search',
     
     ID_INC_PER_MSEC = Decimal.pow( 2, 22 ), // ミリ秒毎のID増分
     ID_INC_PER_SEC = ID_INC_PER_MSEC.mul( 1000 ), // 秒毎のID増分
+    ID_INC_PER_SEC_LEGACY = Math.round( 1000 * ( 29694409027 - 20 ) / ( 1288898870000 - 1142974214000 ) ), // ID 切替以前の増加分
+    // TODO: ID 切替以前は増加分がわからない
+    // → 暫定的に、https://twitter.com/jack/status/20 (data-time-ms: 1142974214000) → https://twitter.com/Twitter/status/29694409027 (data-time-ms: 1288898870000) の平均をとる
+    
     TWEPOCH_OFFSET_MSEC = 1288834974657,
     TWEPOCH_OFFSET_SEC = Math.ceil( TWEPOCH_OFFSET_MSEC / 1000 ), // 1288834974.657 sec (2011.11.04 01:42:54(UTC)) (via http://www.slideshare.net/pfi/id-15755280)
     ID_THRESHOLD = '300000000000000', // 2010.11.04 22時(UTC)頃に、IDが 30000000000以下から300000000000000以上に切り替え
     ID_BEFORE = null,
     ID_AFTER = null,
+    ID_BEFORE_LEGACY = null,
+    ID_AFTER_LEGACY = null,
     
     LINK_ICON_URL = [ // アイコン(48×48)
         'data:image/gif;base64,',
@@ -607,28 +613,55 @@ function get_tweet_id_range( search_tweet_id, search_time_sec, reacted_tweet_id 
         }
     }
     
+    if ( bignum_cmp( search_tweet_id, ID_THRESHOLD ) < 0 ) {
+        return null;
+    }
+    
     var current_id = new Decimal( search_tweet_id ),
-        since_id = current_id.sub( ID_BEFORE ),
+        since_id = current_id.sub( ID_BEFORE ).sub( 1 ),
         max_id = current_id.add( ID_AFTER );
     
     if ( ( reacted_tweet_id ) && ( bignum_cmp( since_id, reacted_tweet_id ) < 0 ) ) {
-        since_id = new Decimal( reacted_tweet_id );
+        since_id = new Decimal( reacted_tweet_id ).sub( 1 );
     }
     
     log_debug( 'since_id:', since_id.toString(), ' current_id:', current_id.toString(), ' max_id:', max_id.toString() );
     
-    if ( since_id.cmp( ID_THRESHOLD ) < 0 ) {
-        return null;
-    }
-    
-    var tweet_id_range = {
+    return {
         current_id : current_id.toString(),
         since_id : since_id.toString(),
         max_id: max_id.toString()
     };
-    
-    return tweet_id_range;
 } // end of get_tweet_id_range()
+
+
+function get_tweet_id_range_legacy( search_tweet_id, reacted_tweet_id ) {
+    if ( ( ! ID_BEFORE_LEGACY ) || ( ! ID_AFTER_LEGACY ) || ( ! search_tweet_id ) ) {
+        return null;
+    }
+    
+    if ( bignum_cmp( ID_THRESHOLD, search_tweet_id ) <= 0 ) {
+        return null;
+    }
+    
+    var current_id = new Decimal( search_tweet_id ),
+        since_id = current_id.sub( ID_BEFORE_LEGACY ).sub( -1 ),
+        max_id = current_id.add( ID_AFTER_LEGACY );
+    
+    if ( ( reacted_tweet_id ) && ( bignum_cmp( since_id, reacted_tweet_id ) < 0 ) ) {
+        since_id = new Decimal( reacted_tweet_id ).sub( -1 );
+    }
+    
+    if ( since_id.cmp( 0 ) < 0 ) {
+        since_id = new Decimal( 0 );
+    }
+    
+    return {
+        current_id : current_id.toString(),
+        since_id : since_id.toString(),
+        max_id: max_id.toString()
+    };
+} // end of get_tweet_id_range_legacy()
 
 
 function get_screen_name_from_url( url ) {
@@ -670,7 +703,7 @@ function get_search_info( parameters ) {
         search_time_sec = parameters.search_time_sec,
         search_time_range = parameters.search_time_range,
         since_id,
-        max_id = parameters.max_id,
+        max_id,
         since,
         until,
         query = null,
@@ -699,8 +732,7 @@ function get_search_info( parameters ) {
             query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
         }
     }
-    
-    if ( ! query ) {
+    else {
         if ( search_time_sec ) {
             since = get_gmt_datetime( ( search_time_sec - ( OPTIONS.HOUR_BEFORE * 3600 ) ) );
             until = get_gmt_datetime( ( search_time_sec + ( OPTIONS.HOUR_AFTER * 3600 + 1 ) ) );
@@ -712,22 +744,24 @@ function get_search_info( parameters ) {
                 query = 'from:' + screen_name + ' since:' + since + ' until:' + until;
             }
         }
-        else if ( max_id ) {
-            search_url_list.push( TIMELINE_API_BASE + screen_name + '/with_replies?max_position=' + Decimal.add( max_id, 1 ).toString() );
-            // 0.2.3.10: max_id → max_position
+        else {
+            tweet_id_range = get_tweet_id_range_legacy( search_tweet_id, reacted_tweet_id );
             
-            until = get_gmt_datetime_from_tweet_id( max_id, 1 );
-            
-            if ( until ) {
-                query = 'from:' + screen_name + ' until:' + until;
+            if ( tweet_id_range ) {
+                since_id = tweet_id_range.since_id;
+                max_id = tweet_id_range.max_id;
+                
+                if ( OPTIONS.IGNORE_SINCE ) {
+                    query = 'from:' + screen_name + ' max_id:' + max_id;
+                }
+                else {
+                    query = 'from:' + screen_name + ' since_id:' + since_id + ' max_id:' + max_id;
+                }
             }
             else {
-                query = 'from:' + screen_name + ' max_id:' + max_id;
+                log_error( '[bug] search information is not specified !' );
+                query = 'from:' + screen_name;
             }
-        }
-        else {
-            log_error( '[bug] "max_id" is not specified !' );
-            query = 'from:' + screen_name;
         }
     }
     
@@ -785,14 +819,17 @@ function get_hide_threshold_tweet_id() {
     
     var search_tweet_id = SEARCH_PARAMETERS.search_tweet_id,
         max_id = SEARCH_PARAMETERS.max_id,
-        limit_tweet_id = search_tweet_id || max_id;
+        limit_tweet_id;
     
-    if ( ! limit_tweet_id ) {
+    if ( ( ! max_id ) || ( ! search_tweet_id ) ) {
         return 0;
     }
     
-    if ( ( max_id ) && ( bignum_cmp( limit_tweet_id, max_id ) < 0 ) ) {
+    if ( bignum_cmp( search_tweet_id, max_id ) < 0 ) {
         limit_tweet_id = max_id;
+    }
+    else {
+        limit_tweet_id = search_tweet_id;
     }
     
     return Decimal.add( limit_tweet_id, 1 ).toString();
@@ -887,26 +924,72 @@ var click_handler_saver = object_extender( {
 var TemplateUserTimeline = {
         DEFAULT_UNTIL_ID : '9223372036854775807', // 0x7fffffffffffffff = 2^63-1
         
+        timeline_status : null, // 'user' / 'search' / 'end' / 'error' / 'stop'
         
         init : function ( screen_name, parameters ) {
             if ( ! parameters ) {
                 parameters = {};
             }
             var self = this,
-                max_tweet_id = parameters.max_tweet_id;
+                max_tweet_id = self.requested_max_tweet_id = parameters.max_tweet_id,
+                max_date = self.max_date = parameters.max_date;
             
-            self.timeline_status = 'user'; // 'user' / 'search' / 'end' / 'error' / 'stop'
+            if ( ! max_tweet_id ) {
+                if ( max_date ) {
+                    max_tweet_id = self.max_tweet_id_from_max_date = get_tweet_id_from_utc_sec( Math.floor( max_date.getTime() / 1000 ) );
+                }
+            }
+            
+            if ( max_tweet_id ) {
+                self.timeline_status = 'user';
+            }
+            else {
+                self.timeline_status = 'search';
+            }
             self.screen_name = screen_name;
-            self.current_max_position = self.current_min_id = self.until_id = ( max_tweet_id ) ? Decimal.add( max_tweet_id, 1 ).toString() : self.DEFAULT_UNTIL_ID;
+            self.until = ( max_date ) ? format_date( new Date( max_date.getTime() + 1000 ), 'YYYY-MM-DD_hh:mm:ss_GMT', true ) : null;
+            self.fetched_min_id = self.until_id = ( max_tweet_id ) ? Decimal.add( max_tweet_id, 1 ).toString() : self.DEFAULT_UNTIL_ID;
             self.tweet_info_list = [];
             
             self.user_timeline_parameters = {
+                max_position : self.until_id,
+                
                 api_endpoint : {
                     url : 'https://twitter.com/i/profiles/show/' + screen_name + '/timeline/with_replies',
                     data : {
                         include_available_features : 1,
                         include_entities : 1,
                         reset_error_state : false,
+                        last_note_ts : null,
+                        max_position : null
+                    }
+                }
+            };
+            
+            self.search_timeline_parameters = {
+                api_max_position : null,
+                // ※ API で指定する max_position は数値ではなく、"TWEET-(from tweet id)-(to tweet id)-(長い文字列)==-T-0" のような文字列であることに注意
+                //    最初はわからないため、HTML より data-min-position を読み取って使用する
+                
+                html_endpoint : {
+                    url : 'https://twitter.com/search',
+                    data : {
+                        f : 'tweets',
+                        vertical : 'default',
+                        src : 'typd',
+                        q : null
+                    }
+                },
+                api_endpoint : {
+                    url : 'https://twitter.com/i/search/timeline',
+                    data : {
+                        f : 'tweets',
+                        vertical : 'default',
+                        src : 'typd',
+                        include_available_features : '1',
+                        include_entities : '1',
+                        reset_error_state : 'false',
+                        q : null,
                         last_note_ts : null,
                         max_position : null
                     }
@@ -924,7 +1007,7 @@ var TemplateUserTimeline = {
             if ( tweet_info ) {
                 var check_tweet_id = ( tweet_info.retweet_id || tweet_info.tweet_id );
                 
-                if ( bignum_cmp( self.current_min_id, check_tweet_id ) <= 0 ) {
+                if ( bignum_cmp( self.fetched_min_id, check_tweet_id ) <= 0 ) {
                     if ( self.timeline_status == 'stop' ) {
                         callback( {
                             tweet_info : null,
@@ -935,7 +1018,7 @@ var TemplateUserTimeline = {
                     return self.fetch_tweet_info( callback );
                 }
                 
-                self.current_min_id = check_tweet_id;
+                self.fetched_min_id = check_tweet_id;
                 
                 callback( {
                     tweet_info : tweet_info,
@@ -948,6 +1031,12 @@ var TemplateUserTimeline = {
             switch ( self.timeline_status ) {
                 case 'user' :
                     self.__get_next_user_timeline( function () {
+                        return self.fetch_tweet_info( callback );
+                    } );
+                    break;
+                
+                case 'search' :
+                    self.__get_next_search_timeline( function () {
                         return self.fetch_tweet_info( callback );
                     } );
                     break;
@@ -970,12 +1059,236 @@ var TemplateUserTimeline = {
         }, // end of stop()
         
         
+        __get_next_user_timeline : function ( callback ) {
+            var self = this,
+                user_timeline_parameters = self.user_timeline_parameters,
+                api_endpoint = user_timeline_parameters.api_endpoint,
+                data = api_endpoint.data;
+            
+            data.last_note_ts = self.__get_last_note_ts();
+            data.max_position = user_timeline_parameters.max_position;
+            
+            $.getJSON( api_endpoint.url, data )
+            .success( function ( json ) {
+                var tweet_info_list = self.tweet_info_list,
+                    min_tweet_id = self.DEFAULT_UNTIL_ID,
+                    jq_html_fragment = self.__get_jq_html_fragment( json.items_html );
+                
+                jq_html_fragment.find( '.js-stream-item' ).each( function () {
+                    var jq_stream_item = $( this ),
+                        tweet_info = self.__get_tweet_info( jq_stream_item );
+                    
+                    if ( ( ! tweet_info ) || ( ! tweet_info.tweet_id  ) ) {
+                        return;
+                    }
+                    
+                    tweet_info.jq_stream_item = jq_stream_item;
+                    tweet_info.timeline_kind = 'user-timeline';
+                    
+                    tweet_info_list.push( tweet_info );
+                    
+                    if ( bignum_cmp( tweet_info.tweet_id, min_tweet_id ) < 0 ) {
+                        min_tweet_id = tweet_info.tweet_id;
+                    }
+                } );
+                
+                log_debug( '__get_next_user_timeline() min_position = ', json.min_position );
+                
+                if ( json.min_position ) {
+                    user_timeline_parameters.max_position = json.min_position;
+                }
+                else if ( bignum_cmp( min_tweet_id, user_timeline_parameters.max_position ) < 0 ) {
+                    user_timeline_parameters.max_position = min_tweet_id;
+                }
+                else {
+                    self.timeline_status = 'search';
+                }
+                
+                if ( ! json.has_more_items ) {
+                    self.timeline_status = 'search';
+                }
+            } )
+            .error( function ( jqXHR, textStatus, errorThrown ) {
+                log_error( api_endpoint.url, textStatus );
+                self.timeline_status = 'error';
+            } )
+            .complete( function () {
+                callback();
+            } );
+        }, // end of __get_next_user_timeline()
+        
+        
+        __get_next_search_timeline : function ( callback ) {
+            var self = this,
+                search_timeline_parameters = self.search_timeline_parameters;
+            
+            if ( ! search_timeline_parameters.api_max_position ) {
+                // 初めに HTML から data-min-position を取得する必要あり
+                return self.__get_first_search_timeline( callback );
+            }
+            
+            var api_endpoint = search_timeline_parameters.api_endpoint,
+                api_data = api_endpoint.data;
+            
+            api_data.last_note_ts = self.__get_last_note_ts();
+            api_data.max_position = search_timeline_parameters.api_max_position;
+            
+            $.getJSON( api_endpoint.url, api_data )
+            .success( function ( json ) {
+                var tweet_info_list = self.tweet_info_list,
+                    json_inner = ( json.inner ) ? json.inner : ( ( json.items_html && json.min_position ) ? json : null );
+                    // items_html/min_position が json.inner ではなく、json 直下にある場合もある（未ログイン時など）
+                
+                if ( ( ! json_inner ) ||  ( ! json_inner.items_html ) || ( ! json_inner.min_position ) ) {
+                    log_error( 'items not found' );
+                    self.timeline_status = 'error';
+                    return;
+                }
+                
+                var jq_html_fragment = self.__get_jq_html_fragment( json_inner.items_html );
+                
+                jq_html_fragment.find( '.js-stream-item' ).each( function () {
+                    var jq_stream_item = $( this ),
+                        tweet_info = self.__get_tweet_info( jq_stream_item );
+                    
+                    if ( ( ! tweet_info ) || ( ! tweet_info.tweet_id  ) ) {
+                        return;
+                    }
+                    
+                    tweet_info.jq_stream_item = jq_stream_item;
+                    tweet_info.timeline_kind = 'search-timeline';
+                    
+                    tweet_info_list.push( tweet_info );
+                } );
+                
+                log_debug( '__get_next_search_timeline() : min_position = ', json_inner.min_position );
+                
+                if ( json_inner.min_position ) {
+                    // ※ data-min-position は数値ではなく、"TWEET-(from tweet id)-(to tweet id)-(長い文字列)==-T-0" の形式→文字列として比較
+                    if ( json_inner.min_position != search_timeline_parameters.api_max_position ) {
+                        search_timeline_parameters.api_max_position = json_inner.min_position;
+                    }
+                    else {
+                        // min_position に変化がなければ終了とみなす
+                        self.timeline_status = 'end';
+                    }
+                }
+                else {
+                    self.timeline_status = 'end';
+                }
+                // 終了判定としては使えなかった（has_more_items が false でも、実際に検索したらまだツイートがある場合がある模様）
+                //{
+                //if ( ! json_inner.has_more_items ) {
+                //    self.timeline_status = 'end';
+                //}
+                //}
+            } )
+            .error( function ( jqXHR, textStatus, errorThrown ) {
+                log_error( api_endpoint.url, textStatus );
+                self.timeline_status = 'error';
+            } )
+            .complete( function () {
+                callback();
+            } );
+            
+            return self;
+        }, // end of __get_next_search_timeline()
+        
+        
+        __get_first_search_timeline : function ( callback ) {
+            var self = this,
+                search_timeline_parameters = self.search_timeline_parameters,
+                html_endpoint = search_timeline_parameters.html_endpoint,
+                html_data = html_endpoint.data,
+                api_endpoint = search_timeline_parameters.api_endpoint,
+                api_data = api_endpoint.data;
+            
+            html_data.q = 'from:' + self.screen_name + ' include:nativeretweets';
+            
+            if ( ( self.requested_max_tweet_id ) || ( ! self.until ) ) {
+                html_data.q += ' max_id:' + Decimal.sub( self.user_timeline_parameters.max_position, 1 ).toString();
+                // ユーザータイムラインでの最後の max_position を使用
+            }
+            else {
+                html_data.q += ' until:' + self.until;
+            }
+            
+            api_endpoint.data.q = html_data.q; // クエリは最初に設定したもので共通
+            
+            $.ajax( {
+                type : 'GET',
+                url : html_endpoint.url,
+                data : html_data,
+                dataType : 'html'
+            } )
+            .success( function ( html ) {
+                var jq_html_fragment = self.__get_jq_html_fragment( html ),
+                    tweet_info_list = self.tweet_info_list,
+                    api_max_position = search_timeline_parameters.api_max_position = jq_html_fragment.find( '*[data-min-position]' ).attr( 'data-min-position' );
+                    // ※ data-min-position は数値ではなく、"TWEET-(from tweet id)-(to tweet id)-(長い文字列)==-T-0" みたいになっていることに注意
+                
+                log_debug( '__get_first_search_timeline() : data-min-position = ', api_max_position );
+                
+                if ( ! api_max_position ) {
+                    if ( jq_html_fragment.find( 'div.SearchEmptyTimeline' ).length <= 0 ) {
+                        log_error( '"data-min-position" not found' );
+                        self.timeline_status = 'error';
+                        return;
+                    }
+                    
+                    self.timeline_status = 'end';
+                    return;
+                }
+                
+                jq_html_fragment.find( '.js-stream-item' ).each( function () {
+                    var jq_stream_item = $( this ),
+                        tweet_info = self.__get_tweet_info( jq_stream_item );
+                    
+                    if ( ( ! tweet_info ) || ( ! tweet_info.tweet_id  ) ) {
+                        return;
+                    }
+                    
+                    tweet_info.jq_stream_item = jq_stream_item;
+                    tweet_info.timeline_kind = 'search-timeline';
+                    
+                    tweet_info_list.push( tweet_info );
+                } );
+            } )
+            .error( function ( jqXHR, textStatus, errorThrown ) {
+                log_error( html_endpoint.url, textStatus );
+                self.timeline_status = 'error';
+            } )
+            .complete( function () {
+                callback();
+            } );
+            
+            return self;
+        }, // end of __get_first_search_timeline()
+        
+        
         __get_last_note_ts : function () {
             var self = this,
                 last_note_ts = new Date().getTime();
             
             return last_note_ts;
         }, // end of __get_last_note_ts()
+        
+        
+        __get_jq_html_fragment : ( function () {
+            if ( ( ! d.implementation ) || ( typeof d.implementation.createHTMLDocument != 'function' ) ) {
+                return function ( html ) {
+                    return $( '<div/>' ).html( html );
+                };
+            }
+            
+            // タイムライン解析段階での余分なネットワークアクセス（画像等の読み込み）抑制
+            var html_document = d.implementation.createHTMLDocument(''),
+                range = html_document.createRange();
+            
+            return function ( html ) {
+                return $( range.createContextualFragment( html ) );
+            };
+        } )(), // end of __get_jq_html_fragment()
         
         
         __get_tweet_info : function ( jq_tweet_container ) {
@@ -1014,83 +1327,8 @@ var TemplateUserTimeline = {
                 return null;
             }
             return tweet_info;
-        }, // end of __get_tweet_info()
+        } // end of __get_tweet_info()
         
-        
-        __get_next_user_timeline : function ( callback ) {
-            var self = this,
-                api_endpoint = self.user_timeline_parameters.api_endpoint,
-                data = api_endpoint.data;
-            
-            data.last_note_ts = self.__get_last_note_ts();
-            data.max_position = self.current_max_position;
-            
-            $.getJSON( api_endpoint.url, data )
-            .success( function ( json ) {
-                var tweet_info_list = self.tweet_info_list,
-                    tweet_count = 0,
-                    min_id = self.DEFAULT_UNTIL_ID,
-                    jq_html_fragment = self.__get_jq_html_fragment( json.items_html );
-                
-                jq_html_fragment.find( '.js-stream-item' ).each( function () {
-                    var jq_stream_item = $( this ),
-                        tweet_info = self.__get_tweet_info( jq_stream_item );
-                    
-                    if ( ( ! tweet_info ) || ( ! tweet_info.tweet_id  ) ) {
-                        return;
-                    }
-                    
-                    tweet_info.jq_stream_item = jq_stream_item;
-                    tweet_info.timeline_kind = 'user-timeline';
-                    
-                    tweet_info_list.push( tweet_info );
-                    
-                    if ( bignum_cmp( tweet_info.tweet_id, min_id ) < 0 ) {
-                        min_id = tweet_info.tweet_id;
-                    }
-                    tweet_count ++;
-                } );
-                
-                if ( json.min_position ) {
-                    self.current_max_position = json.min_position;
-                }
-                else if ( bignum_cmp( min_id, self.current_max_position ) < 0 ) {
-                    self.current_max_position = min_id;
-                }
-                else {
-                    self.timeline_status = 'end';
-                }
-                
-                if ( ! json.has_more_items ) {
-                    self.timeline_status = 'end';
-                }
-            } )
-            .error( function ( jqXHR, textStatus, errorThrown ) {
-                log_error( api_endpoint.url, textStatus );
-                self.timeline_status = 'error';
-            } )
-            .complete( function () {
-                callback();
-            } );
-        }, // end of __get_next_user_timeline()
-        
-        
-        __get_jq_html_fragment : ( function () {
-            if ( ( ! d.implementation ) || ( typeof d.implementation.createHTMLDocument != 'function' ) ) {
-                return function ( html ) {
-                    return $( '<div/>' ).html( html );
-                };
-            }
-            
-            // タイムライン解析段階での余分なネットワークアクセス（画像等の読み込み）抑制
-            var html_document = d.implementation.createHTMLDocument(''),
-                range = html_document.createRange();
-            
-            return function ( html ) {
-                return $( range.createContextualFragment( html ) );
-            };
-        } )() // end of __get_jq_html_fragment()
-    
     }; // end of TemplateUserTimeline
 
 
@@ -1158,6 +1396,10 @@ var recent_retweet_users_dialog = object_extender( {
             '        <span class="Icon Icon--small Icon--retweeted"></span>',
             '        <span class="_timestamp js-short-timestamp""></span>',
             '      </div>',
+            '    </div>',
+            '  <div class="content">',
+            '    <div class="js-tweet-text-container">',
+            '      <p class="TweetTextSize js-tweet-text tweet-text"></p>',
             '    </div>',
             '  </div>',
             '</li>'
@@ -1304,8 +1546,8 @@ var recent_retweet_users_dialog = object_extender( {
             } );
             
             // デフォルトのマウスホイール動作を無効化し、ユーザーリスト部分のみマウスホイールが効くようにする
-            // TODO: Firefox でスクロールがぎこちなくなるので保留
-            /*
+            // → TODO: Firefox でスクロールがぎこちなくなるので保留
+            //{
             //$( d ).on( self.mouse_wheel_event_name, function ( event ) {
             //    event.stopPropagation();
             //    event.preventDefault();
@@ -1322,7 +1564,7 @@ var recent_retweet_users_dialog = object_extender( {
             //    
             //    return false;
             //} );
-            */
+            //}
             
             jq_header_container.find( 'div.IconContainer' ).remove();
             jq_user_list.empty();
@@ -1740,8 +1982,7 @@ var recent_retweet_users_dialog = object_extender( {
                 event.preventDefault();
                 
                 self.__load_referece_to_retweet(
-                    retweet_user_info.id_str,
-                    retweet_user_info.user,
+                    retweet_user_info,
                     jq_user,
                     jq_referece_to_retweet_load_button,
                     jq_referece_to_retweet_loading,
@@ -1759,65 +2000,75 @@ var recent_retweet_users_dialog = object_extender( {
         }, // end of __insert_user()
         
         
-        __load_referece_to_retweet : function ( retweet_id, user, jq_user,  jq_referece_to_retweet_load_button, jq_referece_to_retweet_loading, jq_referece_to_retweet_close_button, jq_referece_to_retweet_open_button ) {
+        __load_referece_to_retweet : function ( retweet_user_info, jq_user,  jq_referece_to_retweet_load_button, jq_referece_to_retweet_loading, jq_referece_to_retweet_close_button, jq_referece_to_retweet_open_button ) {
             var self = this,
+                retweet_id = retweet_user_info.id_str,
+                user = retweet_user_info.user, 
                 screen_name = user.screen_name,
-                until_tweet_id = tweet_id_shift( retweet_id, 60 * self.__get_max_after_retweet_minutes() ),
-                since_tweet_id = tweet_id_shift( retweet_id, -( 60 * self.__get_max_before_retweet_minutes() ) );
+                retweet_date = new Date( retweet_user_info.created_at ),
+                max_date = new Date( retweet_date.getTime() + ( 1000 * 60 * self.__get_max_after_retweet_minutes() ) ),
+                min_date = new Date( retweet_date.getTime() - ( 1000 * 60 * self.__get_max_before_retweet_minutes() ) ),
+                until_tweet_id = tweet_id_shift( retweet_id, ( 60 * self.__get_max_after_retweet_minutes() + 1 ) ),
+                since_tweet_id = tweet_id_shift( retweet_id, -( 60 * self.__get_max_before_retweet_minutes() + 1 ) );
             
             jq_referece_to_retweet_load_button.parent().remove();
             jq_referece_to_retweet_loading.show();
-            
-            if ( ! until_tweet_id ) {
-                jq_referece_to_retweet_loading.hide();
-                log_error( '[TODO] out of range' );
-                return;
-            }
             
             if ( ! since_tweet_id ) {
                 since_tweet_id = ID_THRESHOLD;
             }
             
-            log_debug( 'search conditaions: ', screen_name, since_tweet_id, '～', retweet_id, '～', until_tweet_id );
+            log_debug( '[search conditaions]', screen_name, 'tweet id:', since_tweet_id, '～(', retweet_id, ')～', until_tweet_id, 'date:', min_date.toLocaleString(), '～(', retweet_date.toLocaleString(), ')～', max_date.toLocaleString() );
             
-            var tweet_counter = 0,
-                jq_insert_point = jq_user,
-                jq_stream_item_list = [],
+            var jq_stream_item_list = [],
+                target_retweet_insert_index = -1,
+                ignored_retweet_count = 0,
                 user_timeline = object_extender( TemplateUserTimeline )
                 .init( screen_name, {
-                    max_tweet_id : Decimal.sub( until_tweet_id, 1 ).toString()
+                    max_date : max_date
                 } );
+            
+            
+            function get_jq_target_retweet_stream_item() {
+                var retweet_timestamp = format_date( new Date( retweet_user_info.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
+                    tweet_timestamp = format_date( new Date( retweet_user_info.retweeted_status.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
+                    jq_stream_item = $( self.retweet_timeinfo_template ),
+                    jq_timestamp = jq_stream_item.find( 'span._timestamp' ).css( {
+                        'font-size' : '14px',
+                        'margin-left' : '10px'
+                    } )
+                    .text( retweet_timestamp + ' (RT) / ' + tweet_timestamp + ' (Tweet)' );
+                
+                jq_stream_item.css( {
+                    'opacity' : '0.5'
+                } )
+                .find( 'div.js-stream-tweet' ).css( {
+                    'min-height' : 'auto'
+                } );
+                
+                jq_stream_item.find( 'p.js-tweet-text' ).css( {
+                    'font-size' : '12px'
+                } )
+                .text( retweet_user_info.retweeted_status.text );
+                
+                set_toggle_retweet_content_visible( jq_stream_item );
+                
+                return jq_stream_item;
+            } // end of get_jq_target_retweet_stream_item()
             
             
             function complete() {
                 jq_referece_to_retweet_loading.hide();
                 
-                if ( jq_stream_item_list.length <= 0 ) {
-                    var retweet_user_info = self.screen_name_to_retweet_user_info_map[ screen_name ],
-                        retweet_timestamp = format_date( new Date( retweet_user_info.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
-                        tweet_timestamp = format_date( new Date( retweet_user_info.retweeted_status.created_at ), 'YYYY/MM/DD hh:mm:ss' ),
-                        jq_stream_item = $( self.retweet_timeinfo_template ),
-                        jq_timestamp = jq_stream_item.find( 'span._timestamp' ).css( {
-                            'font-size' : '14px',
-                            'margin-left' : '12px'
-                        } )
-                        .text( retweet_timestamp + ' (RT) / ' + tweet_timestamp + ' (Tweet)' );
-                    
-                    jq_stream_item.css( {
-                        'opacity' : '0.5'
-                    } )
-                    .find( 'div.js-stream-tweet' ).css( {
-                        'min-height' : 'auto'
-                    } );
-                    
-                    jq_stream_item.find( 'p.js-tweet-text' ).css( {
-                        'font-size' : '12px'
-                    } );
-                    
-                    jq_user.after( jq_stream_item );
-                    
-                    jq_stream_item_list.push( jq_stream_item );
+                if ( target_retweet_insert_index < 0 ) {
+                    target_retweet_insert_index = jq_stream_item_list.length;
                 }
+                
+                jq_stream_item_list.splice( target_retweet_insert_index, 0, get_jq_target_retweet_stream_item() );
+                
+                jq_stream_item_list.reverse().forEach( function ( jq_stream_item ) {
+                    jq_user.after( jq_stream_item );
+                } );
                 
                 jq_referece_to_retweet_close_button.click( function ( event ) {
                     jq_stream_item_list.forEach( function ( jq_stream_item ) {
@@ -1883,22 +2134,52 @@ var recent_retweet_users_dialog = object_extender( {
                     
                     var tweet_info = result.tweet_info;
                     
-                    if ( tweet_info.retweeter && bignum_cmp( tweet_info.retweet_id, retweet_id ) !== 0 ) {
+                    if ( target_retweet_insert_index < 0 ) {
+                        if ( bignum_cmp( ( tweet_info.retweet_id || tweet_info.tweet_id ), retweet_id ) <= 0 ) {
+                            // 対象リツイートの挿入位置決定
+                            target_retweet_insert_index = jq_stream_item_list.length;
+                        }
+                    }
+                    
+                    if ( tweet_info.retweeter ) {
+                        // リツイートは無視する
                         
-                        if ( bignum_cmp( tweet_info.retweet_id, since_tweet_id ) <= 0 ) {
+                        ignored_retweet_count ++;
+                        
+                        if ( ( 50 < ignored_retweet_count ) || ( bignum_cmp( tweet_info.retweet_id, since_tweet_id ) <= 0 ) ) {
+                            // TODO: リツイート日時が存在しないため、Tweet ID で比較するしか無い→ since_tweet_id が ID_THRESHOLD の場合、リツイートしかしないアカウントの場合延々と検索してしまう
+                            // →無視されたリツイート数が一定数を超えたら完了とする
                             complete();
                             return;
                         }
+                        
                         search();
                         return;
                     }
                     
-                    if ( bignum_cmp( ( tweet_info.retweet_id || tweet_info.tweet_id ), since_tweet_id ) <= 0 ) {
+                    ignored_retweet_count = 0;
+                    
+                    if ( tweet_info.date.getTime() < min_date.getTime() ) {
                         complete();
                         return;
                     }
                     
-                    var jq_stream_item = tweet_info.jq_stream_item;
+                    var jq_stream_item = tweet_info.jq_stream_item,
+                        quote_url = jq_stream_item.find( 'div.QuoteTweet a.QuoteTweet-link' ).attr( 'href' );
+                    
+                    if ( quote_url ) {
+                        if ( quote_url.charAt( 0 ) == '/' ) {
+                            quote_url = 'https://twitter.com' + quote_url;
+                        }
+                        var jq_quote_link_wrapper = $( '<blockquote><a/></blockquote>' ).css( {
+                            } ),
+                            jq_quote_link = jq_quote_link_wrapper.find( 'a' ).css( {
+                            } )
+                            .attr( 'href', quote_url )
+                            .text( quote_url );
+                        
+                        jq_stream_item.find( 'div.js-tweet-text-container' ).append( jq_quote_link_wrapper );
+                    }
                     
                     // TODO: リプライを検索対象として含めるか？
                     // →とりあえず、含めておく
@@ -1908,7 +2189,7 @@ var recent_retweet_users_dialog = object_extender( {
                     .addClass( 'remained-item' );
                     
                     jq_stream_item.find( [
-                        'a.js-user-profile-link:not(.remained)',
+                        'a.js-user-profile-link:not(.remained-item)',
                         'div.ProfileTweet-action',
                         'div.js-media-container',
                         'div.stream-item-footer',
@@ -1935,7 +2216,7 @@ var recent_retweet_users_dialog = object_extender( {
                         
                         jq_timestamp.css( {
                             'font-size' : '14px',
-                            'margin-left' : '12px'
+                            'margin-left' : '10px'
                         } )
                         .text( format_date( get_date_from_tweet_id( tweet_info.retweet_id ), 'YYYY/MM/DD hh:mm:ss' ) + ' (RT) / ' + timestamp + ' (Tweet)' )
                         .insertAfter( jq_stream_item.find( 'span.Icon--retweeted' ) );
@@ -1958,9 +2239,6 @@ var recent_retweet_users_dialog = object_extender( {
                         
                         self.__reset_tweet_click_event( jq_stream_item );
                     }
-                    
-                    jq_insert_point.after( jq_stream_item );
-                    jq_insert_point = jq_stream_item;
                     
                     jq_stream_item_list.push( jq_stream_item );
                     
@@ -2295,7 +2573,7 @@ function start_search_tweet() {
         }
         
         var jq_tweet_li_innter = jq_tweet_li.find( 'div.js-tweet' );
-        
+
         if ( 0 < jq_tweet_li_innter.length ) {
             jq_tweet_li_innter.css( 'background-color', target_color );
         }
@@ -2392,7 +2670,7 @@ function open_search_window( parameters ) {
     
     user_timeline.fetch_tweet_info( function ( result ) {
         if ( ( ! result ) || ( ! result.tweet_info ) || ( result.tweet_info.timeline_kind != 'user-timeline' ) ) {
-            log_debug( '*** target tweet was not found in user-timeline, then open search-timeline ***', search_parameters.screen_name, target_tweet_id );
+            log_debug( '*** target tweet was not found in user-timeline, then open search-timeline ***', search_parameters.screen_name, target_tweet_id, result );
             search_url = search_timeline_url;
         }
         
@@ -2431,10 +2709,7 @@ function add_rtlink_to_tweet( jq_tweet, tweet_id ) {
     var search_info = get_search_info( {
             search_tweet_id : retweet_id,
             reacted_tweet_id : tweet_id,
-            tweet_id_range : null,
-            screen_name : retweeter,
-            search_time_sec : null,
-            max_id : null
+            screen_name : retweeter
         } ),
         tweet_id_range = search_info.tweet_id_range,
         url_rt_search_list = search_info.search_url_list,
@@ -2529,10 +2804,7 @@ function add_link_to_quote_tweet( jq_item ) {
             screen_name = jq_quote_tweet.attr( 'data-screen-name' ),
             search_info = get_search_info( {
                 search_tweet_id : tweet_id,
-                reacted_tweet_id : null,
-                tweet_id_range : null,
-                screen_name : screen_name,
-                max_id : null
+                screen_name : screen_name
             } ),
             search_url_list = search_info.search_url_list,
             search_parameters = search_info.search_parameters,
@@ -2632,10 +2904,8 @@ function add_link_to_tweet( jq_tweet ) {
     var time_sec = parseInt( jq_tweet.find( 'span[data-time]:first' ).attr( 'data-time' ) ),
         search_info = get_search_info( {
             search_tweet_id : tweet_id,
-            tweet_id_range : null,
             screen_name : screen_name,
-            search_time_sec : time_sec,
-            max_id : null
+            search_time_sec : time_sec
         } ),
         search_url_list = search_info.search_url_list,
         search_parameters = search_info.search_parameters,
@@ -2652,7 +2922,7 @@ function add_link_to_tweet( jq_tweet ) {
         jq_link = result.link,
         removed_number = jq_tweet.find( 'small.' + LINK_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応）
     
-    log_debug( 'add_link_to_tweet(): screen_name:', screen_name, ' tweet_id:', tweet_id, ' removed_number:', removed_number );
+    log_debug( 'add_link_to_tweet(): screen_name:', screen_name, ' tweet_id:', tweet_id, ' removed_number:', removed_number, search_info );
     
     set_click_handler( jq_link, function ( jq_link, event ) {
         open_search_window( {
@@ -2701,15 +2971,13 @@ function add_link_to_activity( jq_activity ) {
             search_info = get_search_info( {
                 search_tweet_id : null,
                 reacted_tweet_id : tweet_id,
-                tweet_id_range : null,
                 screen_name : screen_name,
                 search_time_sec : time_sec,
                 search_time_range : {
                     time_sec : time_sec,
                     min_sec : min_sec,
                     max_sec : max_sec
-                },
-                max_id : null
+                }
             } ),
             search_url_list = search_info.search_url_list,
             search_parameters = search_info.search_parameters,
@@ -2777,9 +3045,7 @@ function add_link_to_action_to_tweet( jq_action_to_tweet ) {
         search_info = get_search_info( {
             search_tweet_id : retweet_id,
             reacted_tweet_id : retweeted_tweet_id,
-            tweet_id_range : null,
-            screen_name : action_screen_name,
-            max_id : null
+            screen_name : action_screen_name
         } ),
         search_url_list = search_info.search_url_list,
         search_parameters = search_info.search_parameters,
@@ -2814,6 +3080,10 @@ function add_link_to_action_to_tweet( jq_action_to_tweet ) {
 
 
 function hide_newer_tweet( jq_tweet, threshold_tweet_id ) {
+    if ( ( ! OPTIONS.HIDE_NEWER_TWEETS ) || ( ! is_search_mode() ) ) {
+        return false;
+    }
+    
     if ( ! threshold_tweet_id ) {
         return false;
     }
@@ -2850,7 +3120,7 @@ function hide_newer_tweet( jq_tweet, threshold_tweet_id ) {
 
 
 function hide_newer_tweet_container( jq_target, threshold_tweet_id ) {
-    if ( ! threshold_tweet_id ) {
+    if ( ( ! OPTIONS.HIDE_NEWER_TWEETS ) || ( ! is_search_mode() ) ) {
         return false;
     }
     
@@ -2968,7 +3238,7 @@ function check_changed_node( target_node ) {
         } );
     }
     
-    hide_newer_tweet_container( jq_target, hide_threshold_tweet_id );
+    hide_newer_tweet_container( jq_target );
     
     check_back_to_top( jq_target );
     
@@ -2990,7 +3260,8 @@ function start_tweet_observer() {
     
     observer.observe( d.body, { childList : true, subtree : true } );
     
-    /*
+    // TODO: MutationObserver() で既存のリンクがあればそれをいったん削除して再挿入することで対処できるのではないかと様子見中
+    //{
     //$( d ).mouseover( function ( event ){
     //   // set_click_handler() でセットした click イベントが、ツイートを「開く」→「閉じる」を実施すると無効化される(Twitter側のスクリプトの動作と思われる)
     //   // → mouseover イベント発火時に、click イベントを再設定することで対応
@@ -3007,8 +3278,7 @@ function start_tweet_observer() {
     //        } );
     //    }
     //} );
-    */
-    // TODO: MutationObserver() で既存のリンクがあればそれをいったん削除して再挿入することで対処できるのではないかと様子見中
+    //}
 } // end of start_tweet_observer()
 
 
@@ -3027,10 +3297,7 @@ function check_404_page() {
         tweet_id = tweet_info.tweet_id,
         search_info = get_search_info( {
             search_tweet_id : tweet_id,
-            tweet_id_range : null,
-            screen_name : screen_name,
-            search_time_sec : null,
-            max_id : null
+            screen_name : screen_name
         } ),
         search_url_list = search_info.search_url_list,
         search_parameters = search_info.search_parameters,
@@ -3116,6 +3383,8 @@ function initialize( user_options ) {
     
     ID_BEFORE = Decimal.mul( ID_INC_PER_SEC, OPTIONS.HOUR_BEFORE * 3600 );
     ID_AFTER = Decimal.mul( ID_INC_PER_SEC, OPTIONS.HOUR_AFTER * 3600 );
+    ID_BEFORE_LEGACY = Decimal.mul( ID_INC_PER_SEC_LEGACY, OPTIONS.HOUR_BEFORE * 3600 );
+    ID_AFTER_LEGACY = Decimal.mul( ID_INC_PER_SEC_LEGACY, OPTIONS.HOUR_AFTER * 3600 );
     ID_THRESHOLD = new Decimal( ID_THRESHOLD );
     
     log_debug( 'ID_INC_PER_SEC =', ID_INC_PER_SEC.toString() );
