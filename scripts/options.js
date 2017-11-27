@@ -18,7 +18,7 @@ $( function () {
             { key : 'HOUR_AFTER', val : 8, min : 0, max : null }
         ,   { key : 'MAX_USER_NUMBER', val : 30, min : 1, max : 100 }
         ,   { key : 'MAX_AFTER_RETWEET_MINUTES', val : 10, min : 1, max : 60 }
-        ,   { key : 'MAX_BEFORE_RETWEET_MINUTES', val : 10, min : 1, max : 60 }
+        ,   { key : 'MAX_BEFORE_RETWEET_MINUTES', val : 10, min : 0, max : 60 }
         ],
         STR_KV_LIST = [
             { key : 'LINK_TEXT' }
