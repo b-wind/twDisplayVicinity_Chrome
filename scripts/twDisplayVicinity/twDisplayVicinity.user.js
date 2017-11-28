@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.5
+// @version         0.2.6.6
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -95,6 +95,17 @@ var OPTIONS = {
     MAX_AFTER_RETWEET_MINUTES : 10, // リツイート後のツイート取得期間(分)
     MAX_BEFORE_RETWEET_MINUTES : 10, // リツイート前のツイート取得時間(分)
     
+    OPEN_LINK_KEYCODE : 70, // 近傍ツイート検索キーコード([f]:70)
+    HELP_OPEN_LINK_KEYCHAR : 'f', // 近傍ツイート検索キー表示
+    
+    OPEN_ACT_LINK_KEYCODE : 65, // アクションの近傍ツイート検索キーコード([a]:65)
+    HELP_OPEN_ACT_LINK_KEYCHAR : 'a', // アクションの近傍ツイート検索キー
+    
+    TOGGLE_RERT_DIALOG_KEYCODE : 69, // {Re:RT]ダイアログを開く/閉じるキーコード([e]:69)
+    HELP_OPEN_RERT_DIALOG_KEYCHAR : 'e', // [Re:RT]ダイアログを開くキー表示
+    
+    STATUSES_RETWEETS_CACHE_SEC : 0, // statuses/retweets API のキャッシュを保持する時間(秒)(0:保持しない)
+    
     OPERATION : true // true: 動作中、false: 停止中
 };
 
@@ -103,6 +114,7 @@ var OPTIONS = {
 
 //{ ■ 共通変数
 var SCRIPT_NAME = 'twDisplayVicinity',
+    SCRIPT_NAME_JA = '近傍ツイート検索',
     
     DEBUG = false;
 
@@ -128,15 +140,6 @@ if ( ( typeof jQuery != 'function' ) || ( typeof Decimal != 'function' ) ) {
 
 var $ = jQuery,
     
-    LANGUAGE = ( function () {
-        try {
-            return ( w.navigator.browserLanguage || w.navigator.language || w.navigator.userLanguage ).substr( 0, 2 );
-        }
-        catch ( error ) {
-            return 'en';
-        }
-    } )(),
-    
     IS_PAGE_404 = ( function () {
         var jq_form_404 = $( 'form.search-404' );
         
@@ -144,6 +147,19 @@ var $ = jQuery,
             return true;
         }
         return false;
+    } )(),
+    
+    LANGUAGE = ( function () {
+        if ( IS_PAGE_404 ) {
+            try {
+                return ( w.navigator.browserLanguage || w.navigator.language || w.navigator.userLanguage ).substr( 0, 2 );
+            }
+            catch ( error ) {
+                return 'en';
+            }
+        }
+        
+        return $( 'html' ).attr( 'lang' );
     } )(),
     
     IS_WEB_EXTENSION = !! ( w.is_web_extension ),
@@ -156,9 +172,9 @@ var $ = jQuery,
 switch ( LANGUAGE ) {
     case 'ja' :
         OPTIONS.LINK_TEXT = '近傍';
-        OPTIONS.LINK_TITLE = '近傍ツイート表示';
+        OPTIONS.LINK_TITLE = '近傍ツイート検索';
         OPTIONS.ACT_LINK_TEXT = '近傍';
-        OPTIONS.ACT_LINK_TITLE = 'アクションの近傍ツイート表示';
+        OPTIONS.ACT_LINK_TITLE = 'アクションの近傍ツイート検索';
         OPTIONS.GO_TO_PAST_TEXT = '以前のツイート↓';
         OPTIONS.CLOSE_TEXT = '閉じる';
         OPTIONS.RECENT_RETWEET_USERS_TEXT = '最近リツイートしたユーザー';
@@ -172,18 +188,19 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = '開く';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
-        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = '全ユーザーについて、リツイート前後のツイートを取得';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = '全てのリツイート前後のツイートを取得';
         OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT = 'まとめて ↓↑';
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE = '全て閉じる';
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT = '全て↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = '全て開く';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = '全て↓';
+        OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL = '[Re:RT]ダイアログを開く';
         break;
     default:
-        OPTIONS.LINK_TEXT = 'vicinity';
-        OPTIONS.LINK_TITLE = 'search vicinity tweets';
-        OPTIONS.ACT_LINK_TEXT = 'vicinity';
-        OPTIONS.ACT_LINK_TITLE = 'search vicinity tweets around action';
+        OPTIONS.LINK_TEXT = 'Vicinity';
+        OPTIONS.LINK_TITLE = 'Search vicinity tweets';
+        OPTIONS.ACT_LINK_TEXT = 'Vicinity';
+        OPTIONS.ACT_LINK_TITLE = 'Search vicinity tweets around action';
         OPTIONS.GO_TO_PAST_TEXT = 'Go to past ↓';
         OPTIONS.CLOSE_TEXT = 'Close';
         OPTIONS.RECENT_RETWEET_USERS_TEXT = 'Recent Retweeters';
@@ -197,12 +214,13 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_BUTTON_TEXT = '↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TITLE = 'Open';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_BUTTON_TEXT = '↓';
-        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = 'Retrieve Tweets around this Retweet (All users)';
+        OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE = 'Retrieve Tweets around all Retweets';
         OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT = 'All ↓↑';
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE = 'Close All';
         OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT = 'All ↑';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = 'Open All';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = 'All ↓';
+        OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL = 'Open [Re:RT] dialog';
         break;
 }
 
@@ -826,7 +844,7 @@ function is_search_mode() {
 
 
 function is_night_mode() {
-    return $( '#user-dropdown .js-nightmode-icon' ).hasClass( 'Icon--crescentFilled' );
+    return ( $( '#user-dropdown .js-nightmode-icon' ).hasClass( 'Icon--crescentFilled' ) || $( 'html' ).hasClass( 'night_mode' ) );
 } // end of is_night_mode()
 
 
@@ -896,7 +914,7 @@ var open_child_window = ( function () {
 var click_handler_saver = object_extender( {
         link_id_prefix : SCRIPT_NAME + '_link_',
         link_id_number : 0,
-        link_dict : [],
+        link_map : [],
         
         
         set_click_handler : function ( jq_link, onclick ) {
@@ -904,20 +922,20 @@ var click_handler_saver = object_extender( {
                 link_id = ( self.link_id_prefix ) + ( self.link_id_number ++ );
             
             jq_link.attr( 'id', link_id );
-            self.link_dict[ link_id ] = onclick;
+            self.link_map[ link_id ] = onclick;
             
             jq_link
-            .unbind( 'click' )
-            .click( function ( event ) {
+            .off( 'click' )
+            .on( 'click', function ( event ) {
                 onclick( $( this ), event );
                 return false;
             } );
             
-            // jq_link.click( onclick ) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
+            // jq_link.on( 'click', onclick ) だと、ツイートを「開く」→「閉じる」した後等にonclickがコールされなくなってしまう(Twitter側のスクリプトでイベントを無効化している？)
             // jq_link.attr( 'onclick', 'javascript:return ' + SCRIPT_NAME + '_click_link' + '( this, window.event || event )' );
             // → [2015.03.20] CSP設定変更により、onclick 属性への設定ができなくなった
             //jq_link.attr( 'target', '_blank' );   //  CSPによるonclick(インラインイベントハンドラ)使用禁止対策
-            // → document の mouseover イベントを監視し、onclick イベントが link_dict に登録されている場合には、イベントを再設定するように修正
+            // → document の mouseover イベントを監視し、onclick イベントが link_map に登録されている場合には、イベントを再設定するように修正
             
             return link_id;
         }, // end of set_click_handler()
@@ -926,7 +944,7 @@ var click_handler_saver = object_extender( {
         get_click_handler : function ( link_id ) {
             var self = this;
             
-            return self.link_dict[ link_id ];
+            return self.link_map[ link_id ];
         } // end of get_click_handler()
     } ),
     
@@ -1348,8 +1366,13 @@ var recent_retweet_users_dialog = object_extender( {
             '      <ol class="activity-popup-users #SCRIPT_NAME#-recent-retweet-users" id="#SCRIPT_NAME#-recent-retweet-users">',
             '      </ol>',
             '    </div>',
+            '    <div id="#SCRIPT_NAME#-shortcut-container" class="modal-content"><table><tbody></tbody></table></div>',
             '  </div>',
             '</div>'
+        ].join( '\n' ),
+        
+        shortcut_template : [
+            '<tr><td class="shortcut"><b class="sc-key"></b></td><td class="shortcut-label"></td></tr>'
         ].join( '\n' ),
         
         stream_item_header_template : [
@@ -1371,7 +1394,7 @@ var recent_retweet_users_dialog = object_extender( {
         ].join( '\n' ),
         
         user_template : [
-            '<li class="js-stream-item stream-item stream-item" data-item-id="#USER_ID#" id="stream-item-user-#USER_ID#" data-item-type="user">',
+            '<li class="js-stream-item stream-item" data-item-id="#USER_ID#" id="stream-item-user-#USER_ID#" data-item-type="user">',
             '  <div class="account js-actionable-user js-profile-popup-actionable" data-screen-name="#SCREEN_NAME#" data-user-id="#USER_ID#" data-name="#USER_NAME#" data-emojified-name="" data-feedback-token="" data-impression-id="" data-retweeted-tweet-id="#RETWEETED_TWEET_ID#" data-retweet-id="#RETWEET_ID#">',
             '    <div class="activity-user-profile-content">',
             '      <div class="content">',
@@ -1402,7 +1425,7 @@ var recent_retweet_users_dialog = object_extender( {
         ].join( '\n' ),
         
         retweet_timeinfo_template : [
-            '<li class="js-stream-item stream-item stream-item">',
+            '<li class="js-stream-item stream-item stream-item-retweeted">',
             '  <div class="tweet js-stream-tweet retweeted" data-item-id="#TWEET_ID#" data-screen-name="#SCREEN_NAME#">',
             '    <div class="context">',
             '      <div class="tweet-context with-icn">',
@@ -1420,12 +1443,27 @@ var recent_retweet_users_dialog = object_extender( {
             '</li>'
         ].join( '\n' ),
         
+        shortcut_list : [
+            { key : 'a', label : ( LANGUAGE == 'ja' ) ? '全て取得／開く' : 'Load or Open All' },
+            { key : 's', label : ( LANGUAGE == 'ja' ) ? '全て閉じる' : 'Close All' },
+            { key : 'j', label : ( LANGUAGE == 'ja' ) ? '下へ' : 'Down' },
+            { key : 'k', label : ( LANGUAGE == 'ja' ) ? '上へ' : 'Up' },
+            { key : 'o', label : ( LANGUAGE == 'ja' ) ? '取得／開く' : 'Load or Open' },
+            { key : 'c', label : ( LANGUAGE == 'ja' ) ? '閉じる' : 'Close' },
+            { key : 'l', label : ( LANGUAGE == 'ja' ) ? '開閉(トグル)' : 'Toggle(Open/Close)' },
+            { key : 'f', label : ( LANGUAGE == 'ja' ) ? '近傍ツイート検索' : 'Search vicinity tweets' },
+            { key : 't', label : ( LANGUAGE == 'ja' ) ? 'ツイートを開く' : 'Open this tweet' },
+            { key : 'u', label : ( LANGUAGE == 'ja' ) ? 'ユーザープロファイルを開く' : "Open user's profile" },
+            { key : 'Esc', label : ( LANGUAGE == 'ja' ) ? 'ダイアログを閉じる' : 'Close this dialog' },
+            { key : '?', label : ( LANGUAGE == 'ja' ) ? 'ヘルプ' : 'Help' }
+        ],
         
         init : function () {
             var self = this,
                 
                 user_template = self.user_template = self.user_template.replace( /#STREAM_ITEM_HEADER#/g, self.stream_item_header_template ),
                 retweet_timeinfo_template = self.retweet_timeinfo_template = self.retweet_timeinfo_template.replace( /#STREAM_ITEM_HEADER#/g, self.stream_item_header_template ),
+                retweet_user_info_list_cache = self.retweet_user_info_list_cache = {},
                 
                 jq_dialog_container = self.jq_dialog_container = $(
                     self.dialog_template
@@ -1442,7 +1480,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'z-index' : '3000',
                     'background' : 'rgba( 0, 0, 0, 0.8 )'
                 } )
-                .click( function ( event ) {
+                .on( 'click', function ( event ) {
                     var jq_target = $( event.target );
                     
                     if ( jq_target.attr( 'id' ) != jq_dialog_container.attr( 'id' ) ) {
@@ -1491,7 +1529,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'right' : '2px',
                     'cursor' : 'pointer'
                 } )
-                .click( function ( event ) {
+                .on( 'click', function ( event ) {
                     event.stopPropagation();
                     event.preventDefault();
                     
@@ -1521,7 +1559,38 @@ var recent_retweet_users_dialog = object_extender( {
                     'padding' : '0 0 0 0',
                     'overflow-y' : 'scroll',
                     'overflow-x' : 'hidden',
+                } ),
+                
+                jq_shortcut_container = self.jq_shortcut_container = jq_dialog.find( '#' + SCRIPT_NAME + '-shortcut-container' ).css( {
+                    'position' : 'absolute',
+                    'top' : '48px',
+                    'left' : '16px',
+                    'z-index' : '10002',
+                    'padding' : '12px',
+                    'box-shadow' : '0px 0px 3px 1px'
+                } )
+                .hide(),
+                
+                jq_shortcut_tbody = jq_shortcut_container.find( 'tbody' ).css( {
                 } );
+            
+            self.shortcut_list.forEach( function ( shortcut ) {
+                var jq_tr = $( self.shortcut_template ),
+                    
+                    jq_shortcut = jq_tr.find( 'td.shortcut' ).css( {
+                        'min-width' : '40px',
+                        'padding' : '2px'
+                    } ),
+                    
+                    jq_label = jq_tr.find( 'td.shortcut-label' ).css( {
+                        'opacity' : '0.8'
+                    } )
+                    .text( shortcut.label );
+                
+                jq_shortcut.find( 'b.sc-key' ).text( shortcut.key );
+                
+                jq_shortcut_tbody.append( jq_tr );
+            } );
             
             jq_dialog_container.hide();
             
@@ -1541,25 +1610,167 @@ var recent_retweet_users_dialog = object_extender( {
                 jq_header_container = self.jq_header_container,
                 jq_title = self.jq_title,
                 jq_loading = self.jq_loading,
-                jq_user_list = self.jq_user_list;
+                jq_user_list = self.jq_user_list,
+                jq_shortcut_container = self.jq_shortcut_container,
+                stream_item_cursor = self.stream_item_cursor = self.__get_stream_item_cursor();
             
             self.retweeted_tweet_id = retweeted_tweet_id;
             
+            self.saved_body_overflow = $( d.body ).css( 'overflow' );
             self.saved_body_overflow_x = $( d.body ).css( 'overflow-x' );
             self.saved_body_overflow_y = $( d.body ).css( 'overflow-y' );
             
             $( d.body )
-            .keydown( function ( event ) {
-                switch ( event.keyCode ) {
-                    case 27 :
-                        event.stopPropagation();
-                        event.preventDefault();
-                        
-                        self.close();
+            .on( 'keypress.rert', function ( event ){
+                var key_code = event.which;
+                
+                switch ( key_code ) {
+                    default :
+                        if (
+                            ( 65 <= key_code && key_code <= 90 ) || // [A]-[Z]
+                            ( 97 <= key_code && key_code <= 122 ) || // [a]-[z]
+                            ( 48 <= key_code && key_code <= 57 ) || // [0]-[9]
+                            ( 44 <= key_code && key_code <= 47 ) || // [,][-][.][/]
+                            ( 60 <= key_code && key_code <= 63 ) || // [<][=][>][?]
+                            ( keycode == 13 ) // [Enter]
+                        ) {
+                            // オーバーレイ表示中は、標準のショートカットキーを無効化
+                            event.stopPropagation();
+                            event.preventDefault();
+                        }
                         return false;
                 }
             } )
+            .on( 'keydown.rert', function ( event ) {
+                var key_code = event.keyCode;
+                
+                if (
+                    ( 65 <= key_code && key_code <= 90 ) || // [a-z][A-Z]
+                    ( 48 <= key_code && key_code <= 57 ) || // [0-9]
+                    ( 188 <= key_code && key_code <= 191 ) || // [,-./][<=>?]
+                    ( key_code == 13 ) || // [Enter]
+                    ( key_code == 27 ) // [Esc]
+                ) {
+                    if ( event.altKey || event.ctrlKey ) {
+                        return;
+                    }
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                else {
+                    // 上記以外のキーについては何もしない（ブラウザのデフォルト動作を受け付ける）
+                    return;
+                }
+                
+                var jq_help_button = jq_header_container.find( 'div.help button' ),
+                    is_help_opened = jq_help_button.hasClass( 'open' );
+                
+                if ( is_help_opened ) {
+                    if ( ( key_code != 191 ) && ( key_code != 27 ) ) {
+                        // ヘルプ表示時は [?] と [Esc] 以外は受け付けない
+                        return false;
+                    }
+                }
+                
+                switch ( key_code ) {
+                    case 65 : // [a]
+                        var jq_load_all_button = jq_header_container.find( 'div.load-all button' ),
+                            jq_open_all_button = jq_header_container.find( 'div.open-all button' );
+                        
+                        if ( jq_load_all_button.is( ':hidden' ) && jq_open_all_button.is( ':hidden' ) ) {
+                            break;
+                        }
+                        
+                        if ( jq_load_all_button.is( ':visible' ) ) {
+                            jq_load_all_button.click();
+                        }
+                        else {
+                            jq_open_all_button.click();
+                        }
+                        
+                        break;
+                        
+                    case 83 : // [s]
+                        var jq_close_all_button = jq_header_container.find( 'div.close-all button' );
+                        
+                        if ( jq_close_all_button.is( ':hidden' ) ) {
+                            break;
+                        }
+                        
+                        jq_close_all_button.click();
+                        
+                        break;
+                    
+                    case 74 : // [j]
+                        stream_item_cursor.down();
+                        
+                        break;
+                    
+                    case 75 : // [k]
+                        stream_item_cursor.up();
+                        
+                        break;
+                    
+                    case 79 : // [o]
+                        stream_item_cursor.open();
+                        
+                        break;
+                    
+                    case 67 : // [c]
+                        stream_item_cursor.close();
+                        
+                        break;
+                    
+                    case 76 : // [l]
+                        stream_item_cursor.toggle();
+                        
+                        break;
+                    
+                    case 70 : // [f]
+                        stream_item_cursor.open_vicinity_link();
+                        
+                        break;
+                    
+                    case 84 : // [t]
+                        stream_item_cursor.open_tweet();
+                        
+                        break;
+                    
+                    case 85 : // [u]
+                        stream_item_cursor.open_user_profile();
+                        
+                        break;
+                    
+                    case 13 : // [Enter]
+                        stream_item_cursor.toggle_retweet();
+                        
+                        break;
+                    
+                    case 191 : // [?]
+                        jq_help_button.click();
+                        
+                        break;
+                    
+                    case 69 : // [e]
+                        self.close();
+                        
+                        break;
+                        
+                    case 27 : // [ESC]
+                        if ( is_help_opened ) {
+                            jq_help_button.click();
+                        }
+                        else {
+                            self.close();
+                        }
+                        
+                        break;
+                }
+                
+                return false;
+            } )
             .css( {
+                // ダイアログを出している間は body のスクロールをさせない
                 'overflow-x' : 'hidden',
                 'overflow-y' : 'hidden'
             } );
@@ -1585,9 +1796,14 @@ var recent_retweet_users_dialog = object_extender( {
             //} );
             //}
             
+            jq_shortcut_container.hide();
+            
             jq_header_container.find( 'div.IconContainer' ).remove();
             jq_user_list.empty();
-            jq_title.text( OPTIONS.LOADING_TEXT );
+            jq_title.css( {
+                'color' : 'inherit'
+            } )
+            .text( OPTIONS.LOADING_TEXT );
             jq_loading.show();
             
             self.current_request_id ++;
@@ -1597,7 +1813,10 @@ var recent_retweet_users_dialog = object_extender( {
                     jq_loading.hide();
                     
                     if ( result_message != 'ignore' ) {
-                        jq_title.text( OPTIONS.LOADING_ERROR_TEXT );
+                        jq_title.css( {
+                            'color' : 'red'
+                        } )
+                        .text( OPTIONS.LOADING_ERROR_TEXT );
                     }
                     return;
                 }
@@ -1660,6 +1879,8 @@ var recent_retweet_users_dialog = object_extender( {
                     
                     jq_loading.hide();
                     
+                    stream_item_cursor.init( jq_user_list );
+                    
                     if ( retweet_user_info_to_show_list.length <= 0 ) {
                         return;
                     }
@@ -1669,7 +1890,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'bottom' : '8px',
                             'right' : '24px'
                         } )
-                        .addClass( 'all-load' )
+                        .addClass( 'load-all' )
                         .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TITLE ),
                         
                         jq_load_all_button = jq_load_all_button_wrapper.find( 'button.btn' ).css( {
@@ -1678,7 +1899,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'cursor' : 'pointer'
                         } )
                         .text( OPTIONS.REFERECE_TO_RETWEET_LOAD_ALL_BUTTON_TEXT )
-                        .click( function ( event ) {
+                        .on( 'click', function ( event ) {
                             self.jq_user_list.find( 'div.IconContainer.load-item button.btn' ).each( function () {
                                 var jq_load_button = $( this );
                                 
@@ -1703,7 +1924,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'bottom' : '8px',
                             'right' : '24px'
                         } )
-                        .addClass( 'all-close' )
+                        .addClass( 'close-all' )
                         .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TITLE )
                         .hide(),
                         
@@ -1713,7 +1934,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'cursor' : 'pointer'
                         } )
                         .text( OPTIONS.REFERECE_TO_RETWEET_CLOSE_ALL_BUTTON_TEXT )
-                        .click( function ( event ) {
+                        .on( 'click', function ( event ) {
                             self.jq_user_list.find( 'div.IconContainer.close-item button.btn' ).each( function () {
                                 var jq_close_button = $( this );
                                 
@@ -1734,7 +1955,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'bottom' : '8px',
                             'right' : '84px'
                         } )
-                        .addClass( 'all-open' )
+                        .addClass( 'open-all' )
                         .attr( 'data-original-title', OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE )
                         .hide(),
                         
@@ -1744,7 +1965,7 @@ var recent_retweet_users_dialog = object_extender( {
                             'cursor' : 'pointer'
                         } )
                         .text( OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT )
-                        .click( function ( event ) {
+                        .on( 'click', function ( event ) {
                             self.jq_user_list.find( 'div.IconContainer.open-item button.btn' ).each( function () {
                                 var jq_open_button = $( this );
                                 
@@ -1758,12 +1979,43 @@ var recent_retweet_users_dialog = object_extender( {
                             event.preventDefault();
                             
                             return false;
+                        } ),
+                        
+                        jq_help_button_wrapper = $( self.reference_to_retweet_button_template ).css( {
+                            'position' : 'absolute',
+                            'bottom' : '8px',
+                            'left' : '16px'
+                        } )
+                        .addClass( 'help' )
+                        .attr( 'data-original-title', ( LANGUAGE == 'ja' ) ? 'ヘルプ' : 'Help' ),
+                        
+                        jq_help_button = jq_help_button_wrapper.find( 'button.btn' ).css( {
+                            'font-size' : '14px',
+                            'padding' : '6px 8px',
+                            'cursor' : 'pointer'
+                        } )
+                        .text( '?' )
+                        .addClass( 'close' )
+                        .on( 'click', function ( event ) {
+                            if ( jq_shortcut_container.is( ':hidden' ) ) {
+                                jq_shortcut_container.show();
+                                jq_help_button.removeClass( 'close' ).addClass( 'open' );
+                            }
+                            else {
+                                jq_shortcut_container.hide();
+                                jq_help_button.removeClass( 'open' ).addClass( 'close' );
+                            }
+                            event.stopPropagation();
+                            event.preventDefault();
+                            
+                            return false;
                         } );
                     
                     self.jq_header_container
                     .append( jq_load_all_button_wrapper )
                     .append( jq_close_all_button_wrapper )
-                    .append( jq_open_all_button_wrapper );
+                    .append( jq_open_all_button_wrapper )
+                    .append( jq_help_button_wrapper );
                 } // end of check_complete()
                 
                 
@@ -1811,18 +2063,19 @@ var recent_retweet_users_dialog = object_extender( {
                 jq_dialog_container = self.jq_dialog_container,
                 jq_user_list = self.jq_user_list;
             
-            $( jq_user_list ).unbind( self.mouse_wheel_event_name );
+            $( jq_user_list ).off( self.mouse_wheel_event_name );
             
-            $( d ).unbind( self.mouse_wheel_event_name );
+            $( d ).off( self.mouse_wheel_event_name );
             
             $( d.body )
             .css( {
                 'overflow-x' : self.saved_body_overflow_x,
                 'overflow-y' : self.saved_body_overflow_y,
-                'overflow' : ''
+                'overflow' : self.saved_body_overflow
             } )
-            .unbind( self.mouse_wheel_event_name )
-            .unbind( 'keydown' );
+            .off( self.mouse_wheel_event_name )
+            .off( 'keydown.rert' )
+            .off( 'keypress.rert' );
             
             jq_dialog_container.hide();
             
@@ -1830,11 +2083,27 @@ var recent_retweet_users_dialog = object_extender( {
         }, // end of close()
         
         
+        is_opened : function () {
+            var self = this;
+            
+            return self.jq_dialog_container.is( ':visible' );
+        }, // end of is_opened()
+        
+        
         __load_recent_retweet_user_info : function ( request_id, retweeted_tweet_id, callback ) {
             var self = this,
                 max_user_number = self.__get_max_user_number(),
                 limit_user_number = max_user_number + 10, // 数が少なく取れたり重複したりするケースもあるので、大目に指定
                 statuses_retweets_url = API_STATUSES_RETWEETS_TEMPLATE.replace( /#TWEETID#/g, retweeted_tweet_id ).replace( /#NUMBER#/g, '' + limit_user_number );
+            
+            if ( 0 < OPTIONS.STATUSES_RETWEETS_CACHE_SEC ) {
+                var retweet_user_info_list = self.retweet_user_info_list_cache[ statuses_retweets_url ];
+                
+                if ( retweet_user_info_list ) {
+                    callback( request_id, 'ok', retweet_user_info_list );
+                    return self;
+                }
+            }
             
             $.ajax( {
                 type : 'GET',
@@ -1848,6 +2117,13 @@ var recent_retweet_users_dialog = object_extender( {
                 if ( request_id != self.current_request_id ) {
                     callback( request_id, 'ignore', retweet_user_info_list );
                     return;
+                }
+                
+                if ( 0 < OPTIONS.STATUSES_RETWEETS_CACHE_SEC ) {
+                    self.retweet_user_info_list_cache[ statuses_retweets_url ] = retweet_user_info_list;
+                    setTimeout( function () {
+                        delete self.retweet_user_info_list_cache[ statuses_retweets_url ];
+                    }, OPTIONS.STATUSES_RETWEETS_CACHE_SEC * 1000 );
                 }
                 
                 callback( request_id, 'ok', retweet_user_info_list );
@@ -2000,7 +2276,7 @@ var recent_retweet_users_dialog = object_extender( {
             } );
             
             
-            jq_referece_to_retweet_load_button.click( function ( event ) {
+            jq_referece_to_retweet_load_button.on( 'click', function ( event ) {
                 event.stopPropagation();
                 event.preventDefault();
                 
@@ -2151,7 +2427,7 @@ var recent_retweet_users_dialog = object_extender( {
                     jq_user.after( jq_stream_item );
                 } );
                 
-                jq_referece_to_retweet_close_button.click( function ( event ) {
+                jq_referece_to_retweet_close_button.on( 'click', function ( event ) {
                     jq_stream_item_list.forEach( function ( jq_stream_item ) {
                         jq_stream_item.hide();
                     } );
@@ -2165,7 +2441,7 @@ var recent_retweet_users_dialog = object_extender( {
                     return false;
                 } );
                 
-                jq_referece_to_retweet_open_button.click( function ( event ) {
+                jq_referece_to_retweet_open_button.on( 'click', function ( event ) {
                     jq_stream_item_list.forEach( function ( jq_stream_item ) {
                         jq_stream_item.show();
                     } );
@@ -2184,18 +2460,24 @@ var recent_retweet_users_dialog = object_extender( {
             
             
             function set_toggle_retweet_content_visible( jq_stream_item ) {
-                var jq_content = jq_stream_item.find( 'div.content:has(div.js-tweet-text-container)' )
-                    .hide(),
-                    is_hidden = true;
+                var jq_content = jq_stream_item.find( 'div.content:has(div.js-tweet-text-container)' ).css( {
+                        'min-height' : '50px'
+                    } )
+                    .hide();
                 
-                jq_stream_item.click( function ( event ) {
-                    if ( is_hidden ) {
+                self.__reset_tweet_click_event( jq_stream_item );
+                
+                jq_stream_item
+                .addClass( 'hidden-item' )
+                .on( 'click', function ( event ) {
+                    if ( jq_content.is( ':hidden' ) ) {
                         jq_content.show();
+                        jq_stream_item.removeClass( 'hidden-item' );
                     }
                     else {
                         jq_content.hide();
+                        jq_stream_item.addClass( 'hidden-item' );
                     }
-                    is_hidden = ! is_hidden;
                     
                     event.stopPropagation();
                     event.preventDefault();
@@ -2240,15 +2522,19 @@ var recent_retweet_users_dialog = object_extender( {
                     $.get( iframe_url )
                     .success( function ( html ) {
                         var jq_html_fragment = get_jq_html_fragment( html ),
-                            thumb_url = jq_html_fragment.find( 'img[data-src]' ).attr( 'data-src' ),
+                            found_thumb_url = jq_html_fragment.find( 'img[data-src]' ).attr( 'data-src' ),
+                            thumb_url = ( found_thumb_url ) ? found_thumb_url : 'https://ton.twimg.com/tfw/assets/news_stroke_v1_78ce5b21fb24a7c7e528d22fc25bd9f9df7f24e2.svg',
                             title = jq_html_fragment.find( 'h2.TwitterCard-title' ).text(),
+                            
                             jq_quote_link_wrapper = $( '<blockquote></blockquote>' ).css( {
                             } )
                             .addClass( 'clearfix' ),
+                            
                             jq_data_card_link = $( '<a><img /><span /></a>' ).css( {
                             } )
                             .attr( 'href', target_url )
                             .attr( 'title', title ),
+                            
                             jq_data_card = jq_data_card_link.find( 'img' ).css( {
                                 'float' : 'left',
                                 'width' : '75px',
@@ -2258,6 +2544,7 @@ var recent_retweet_users_dialog = object_extender( {
                                 'border-radius' : '6px'
                             } )
                             .attr( 'src', thumb_url ),
+                            
                             jq_data_card_text = jq_data_card_link.find( 'span' ).css( {
                                 'font-size' : '12px'
                             } )
@@ -2446,10 +2733,258 @@ var recent_retweet_users_dialog = object_extender( {
         }, // end of __load_referece_to_retweet()
         
         
+        __get_stream_item_cursor : function () {
+            var self = this,
+                stream_item_cursor;
+            
+            stream_item_cursor = object_extender( {
+                initialized : false,
+                
+                jq_focused_item : $( [] ),
+                
+                init : function ( jq_user_list ) {
+                    var self = this;
+                    
+                    self.jq_user_list = jq_user_list;
+                    
+                    self.focus( jq_user_list.find( 'li.js-stream-item[data-item-type="user"]:first' ) );
+                    
+                    self.initialized = true;
+                    
+                    return self;
+                }, // end of init()
+                
+                
+                focus : function ( jq_stream_item ) {
+                    var self = this,
+                        jq_old_focused_item = self.jq_focused_item;
+                    
+                    if ( jq_stream_item.length <= 0 ) {
+                        return self;
+                    }
+                    
+                    if ( 0 < jq_old_focused_item.length ) {
+                        jq_old_focused_item.css( {
+                            'border' : ''
+                        } )
+                        .removeClass( SCRIPT_NAME + '-focused' );
+                    }
+                    
+                    self.jq_focused_item = jq_stream_item.css( {
+                        'border' : 'solid 1px red'
+                    } )
+                    .addClass( SCRIPT_NAME + '-focused' );
+                    
+                    return self;
+                }, // end of focus()
+                
+                
+                down : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item,
+                        jq_next_item = jq_focused_item.nextAll( 'li.js-stream-item:visible' ).first();
+                    
+                    self.focus( jq_next_item );
+                    self.__scroll_to( jq_next_item );
+                    
+                    return self;
+                }, // end of down()
+                
+                
+                up : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item,
+                        jq_next_item = jq_focused_item.prevAll( 'li.js-stream-item:visible' ).first();
+                    
+                    self.focus( jq_next_item );
+                    self.__scroll_to( jq_next_item );
+                    
+                    return self;
+                }, // end of up()
+                
+                
+                open : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item;
+                    
+                    if ( jq_focused_item.hasClass( 'stream-item-retweeted' ) ) {
+                        if ( jq_focused_item.hasClass( 'hidden-item' ) ) {
+                            jq_focused_item.click();
+                        }
+                        return self;
+                    }
+                    
+                    if ( jq_focused_item.attr( 'data-item-type' ) != 'user' ) {
+                        return self;
+                    }
+                    
+                    jq_focused_item.find( 'div.IconContainer.open-item:visible button, div.IconContainer.load-item:visible button' ).click();
+                    
+                    return self;
+                }, // end of open()
+                
+                
+                close : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item,
+                        jq_target_item = ( jq_focused_item.attr( 'data-item-type' ) == 'user' ) ? jq_focused_item : jq_focused_item.prevAll( 'li.js-stream-item[data-item-type="user"]' ).first(),
+                        jq_button_close = jq_target_item.find( 'div.IconContainer.close-item:visible button' );
+                    
+                    if ( jq_button_close.length <= 0 ) {
+                        return self;
+                    }
+                    
+                    jq_button_close.click();
+                    
+                    self.focus( jq_target_item );
+                    self.__scroll_to( jq_target_item );
+                    
+                    return self;
+                }, // end of close()
+                
+                
+                toggle : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item,
+                        jq_target_item = ( jq_focused_item.attr( 'data-item-type' ) == 'user' ) ? jq_focused_item : jq_focused_item.prevAll( 'li.js-stream-item[data-item-type="user"]' ).first();
+                    
+                    if ( 0 < jq_target_item.find( 'div.IconContainer.close-item:visible button' ).length ) {
+                        self.close();
+                    }
+                    else {
+                        self.open();
+                    }
+                    
+                    return self;
+                }, // end of toggle()
+                
+                
+                toggle_retweet : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item;
+                    
+                    if ( ! jq_focused_item.hasClass( 'stream-item-retweeted' ) ) {
+                        return;
+                    }
+                    
+                    jq_focused_item.click();
+                    
+                    return self;
+                }, // end of toggle_retweet()
+                
+                
+                open_vicinity_link : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item;
+                    
+                    self.jq_focused_item.find( 'small.' + LINK_CONTAINER_CLASS + ' a, small.' + ACT_CONTAINER_CLASS + ' a' ).first().click();
+                    
+                    return self;
+                }, // end of open_vicinity_link()
+                
+                
+                open_tweet : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item;
+                    
+                    self.jq_focused_item.find( 'a.js-permalink' ).first().click();
+                    
+                    return self;
+                }, // end of open_tweet()
+                
+                
+                open_user_profile : function () {
+                    var self = this;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    var jq_focused_item = self.jq_focused_item,
+                        jq_user_profile_link = jq_focused_item.find( 'a.js-user-profile-link' );
+                    
+                    if ( 0 < jq_user_profile_link.length ) {
+                        jq_user_profile_link.click();
+                        return self;
+                    }
+                    
+                    jq_focused_item.prevAll( 'li.js-stream-item[data-item-type="user"]' ).first().find( 'a.js-user-profile-link' ).click();
+                    
+                    return self;
+                }, // end of open_tweet()
+                
+                
+                __scroll_to : function ( jq_stream_item ) {
+                    var self = this,
+                        jq_user_list = self.jq_user_list;
+                    
+                    if ( ! self.initialized ) {
+                        return self;
+                    }
+                    
+                    if ( jq_stream_item.length <= 0 ) {
+                        return self;
+                    }
+                    
+                    //jq_user_list.animate( {
+                    //    scrollTop : jq_stream_item.position().top - jq_user_list.children().first().position().top - 12
+                    //}, 'fast' );
+                    jq_user_list.scrollTop( jq_stream_item.position().top - jq_user_list.children().first().position().top - 12 );
+                    
+                    return self;
+                } // end of __scroll_to()
+            } );
+            
+            return stream_item_cursor;
+        }, // end of __get_stream_item_cursor()
+        
+        
         __reset_tweet_click_event : function ( jq_stream_item ) {
             var self = this;
             
-            jq_stream_item.click( function ( event ) {
+            jq_stream_item.on( 'click', function ( event ) {
+                self.stream_item_cursor.focus( jq_stream_item );
+                
                 event.stopPropagation();
                 event.preventDefault();
                 
@@ -2468,7 +3003,7 @@ var recent_retweet_users_dialog = object_extender( {
             var self = this,
                 jq_link = $( link );
             
-            jq_link.click( function ( event ) {
+            jq_link.on( 'click', function ( event ) {
                 var url = jq_link.attr( 'href' );
                 
                 if ( /^(?:\/|https?:\/\/)/.test( url ) ) {
@@ -2970,7 +3505,7 @@ function create_recent_retweet_users_button( tweet_id ) {
         } )
         .text( OPTIONS.RECENT_RETWEET_USERS_BUTTON_TEXT );
     
-    jq_recent_retweet_users_button_container.click( function ( event ) {
+    jq_button.on( 'click', function ( event ) {
         event.stopPropagation();
         event.preventDefault();
         
@@ -3353,8 +3888,8 @@ function check_back_to_top( jq_target ) {
     
     function set_event( jq_go_to_past_button ) {
         jq_go_to_past_button
-        .unbind( 'click' )
-        .click( function ( event ) {
+        .off( 'click' )
+        .on( 'click', function ( event ) {
             var screen_name = get_screen_name_from_url(),
                 jq_last_tweet = $( 'ol.stream-items div.js-stream-tweet:last' );
             
@@ -3403,6 +3938,43 @@ function check_back_to_top( jq_target ) {
 } // end of check_back_to_top()
 
 
+function check_help_dialog( jq_target ) {
+    ( ( jq_target.attr( 'id' ) == 'keyboard-shortcut-dialog' ) ? jq_target : jq_target.find( '#keyboard-shortcut-dialog' ) ).each( function () {
+        var jq_help_dialog = $( this ),
+            help_class_name = SCRIPT_NAME + '_key_help';
+        
+        if ( 0 < jq_help_dialog.find( '.' + help_class_name ).length ) {
+            return;
+        }
+        
+        var key_info_list = [
+                { key : OPTIONS.HELP_OPEN_LINK_KEYCHAR, label : OPTIONS.LINK_TITLE },
+                { key : OPTIONS.HELP_OPEN_ACT_LINK_KEYCHAR, label : OPTIONS.ACT_LINK_TITLE },
+                { key : OPTIONS.HELP_OPEN_RERT_DIALOG_KEYCHAR, label : OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL }
+            ],
+            jq_modal_table_tbody = jq_help_dialog.find( 'table.modal-table:first tbody' );
+        
+        key_info_list.forEach( function ( key_info ) {
+            var jq_tr = jq_modal_table_tbody.find( 'tr:first' ).clone()
+                .addClass( help_class_name ),
+                
+                jq_shortcut_key = jq_tr.find( '.shortcut .sc-key' )
+                .empty()
+                .text( key_info.key ),
+                
+                jq_shortcut_label = jq_tr.find( '.shortcut-label' ).css( {
+                    'max-width' : '200px',
+                    'overflow' : 'hidden'
+                } )
+                .empty()
+                .text( key_info.label ) ;
+            
+            jq_modal_table_tbody.append( jq_tr );
+        } );
+    } );
+} // end of check_help_dialog()
+
+
 function check_changed_node( target_node ) {
     if ( ( ! target_node ) || ( target_node.nodeType != 1 ) ) {
         return false;
@@ -3444,6 +4016,8 @@ function check_changed_node( target_node ) {
     
     check_back_to_top( jq_target );
     
+    check_help_dialog( jq_target );
+    
 } // end of check_changed_node()
 
 
@@ -3473,8 +4047,8 @@ function start_tweet_observer() {
     //    
     //    if ( onclick ) {
     //        jq_target
-    //        .unbind( 'click' );
-    //        .click( function ( event ) {
+    //        .off( 'click' );
+    //        .on( 'click', function ( event ) {
     //            onclick( $( this ), event );
     //            return false;
     //        } );
@@ -3482,6 +4056,69 @@ function start_tweet_observer() {
     //} );
     //}
 } // end of start_tweet_observer()
+
+
+function search_and_click_button_on_stream_item( event, button_selector ) {
+    function get_jq_button( jq_ancestor ) {
+        return ( 0 < jq_ancestor.length ) ? jq_ancestor.find( button_selector ) : $( [] );
+    } // end of get_jq_button()
+    
+    var tweet_selector = SELECTOR_INFO.simple_tweet_selector + ', div.QuoteTweet div.js-permalink[data-item-type="tweet"]',
+        jq_gallery = $( d.body ).find( '.Gallery, .js-modal-panel' ),
+        jq_target_container = ( ( 0 < jq_gallery.length ) && jq_gallery.is( ':visible' ) ) ? jq_gallery.find( tweet_selector ) : $( [] ),
+        jq_button = get_jq_button( ( ( 0 < jq_gallery.length ) && jq_gallery.hasClass( 'js-modal-panel' ) ) ? jq_gallery : jq_target_container );
+    
+    if ( ( jq_target_container.length <= 0 ) || ( jq_button.length <= 0 ) ) {
+        var jq_ancestor = $( d.body ).find( '#permalink-overlay:visible' );
+        
+        if ( jq_ancestor.length <= 0 ) {
+            jq_ancestor = $( d.body );
+        }
+        
+        jq_target_container = jq_ancestor.find( '.selected-stream-item, .is-selected-tweet' );
+        jq_button = get_jq_button( jq_target_container );
+        
+        if ( ( jq_target_container.length <= 0 ) || ( jq_button.length <= 0 ) ) {
+            jq_target_container = jq_ancestor.find( '.permalink-tweet' );
+            jq_button = get_jq_button( jq_target_container );
+        }
+        
+        if ( ( jq_target_container.length <= 0 ) || ( jq_button.length <= 0 ) ) {
+            return;
+        }
+    }
+    
+    event.stopPropagation();
+    event.preventDefault();
+    
+    jq_button.first().click();
+    
+    return false;
+    
+} // end of search_and_click_button_on_stream_item()
+
+
+function start_key_observer() {
+    $( d.body )
+    .on( 'keydown.main', function ( event ) {
+        if ( recent_retweet_users_dialog.is_opened() ) {
+            return;
+        }
+        
+        var key_code = event.keyCode;
+        
+        switch ( key_code ) {
+            case OPTIONS.OPEN_LINK_KEYCODE :
+                return search_and_click_button_on_stream_item( event, 'small.' + LINK_CONTAINER_CLASS + ' a' );
+            
+            case OPTIONS.OPEN_ACT_LINK_KEYCODE :
+                return search_and_click_button_on_stream_item( event, 'small.' + ACT_CONTAINER_CLASS + ' a' );
+            
+            case OPTIONS.TOGGLE_RERT_DIALOG_KEYCODE :
+                return search_and_click_button_on_stream_item( event, '.' + SCRIPT_NAME + '-recent-retweets-button button' );
+        }
+    } );
+} // end of start_key_observer()
 
 
 function check_404_page() {
@@ -3495,71 +4132,95 @@ function check_404_page() {
         return false;
     }
     
-    var screen_name = tweet_info.screen_name,
-        tweet_id = tweet_info.tweet_id,
-        search_info = get_search_info( {
-            search_tweet_id : tweet_id,
-            screen_name : screen_name
-        } ),
-        search_url_list = search_info.search_url_list,
-        search_parameters = search_info.search_parameters,
-        result = get_jq_link_container( search_url_list, {
-            class_name : LINK_CONTAINER_CLASS,
-            title : OPTIONS.LINK_TITLE,
-            text : OPTIONS.LINK_TEXT,
-            css : {
-                'color' : OPTIONS.LINK_COLOR,
-                'padding' : '4px'
+    function check_header( target_node ) {
+        if ( ( ! target_node ) || ( target_node.nodeType != 1 ) ) {
+            return false;
+        }
+        
+        var jq_target = $( target_node );
+        
+        ( ( jq_target.prop( 'tagName' ) == 'H1' ) ? jq_target : jq_target.find( 'h1' ) ).each( function () {
+            var jq_h1 = $( this );
+            
+            if ( 0 < jq_h1.find( 'small.' + LINK_CONTAINER_CLASS ).length ) {
+                return;
             }
-        } ),
-        jq_link_container = result.container,
-        jq_link = result.link;
-    
-    jq_link_container.css( {
-        'display' : 'inline-block',
-        // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
-        'background-color' : 'inherit' // 'lightyellow' → 'inherit'
-    } );
-    
-    jq_link.css( {
-        // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
-        'color' : 'inherit', // '#0084b4' → 'inherit'
-        'font-size' : '16px',
-        'font-weight' : 'bold'
-    } );
-    
-    set_click_handler( jq_link, function ( jq_link, event ) {
-        open_search_window( {
-            jq_link : jq_link,
-            event : event,
-            search_parameters : search_parameters,
-            child_window : null
+            
+            var screen_name = tweet_info.screen_name,
+                tweet_id = tweet_info.tweet_id,
+                search_info = get_search_info( {
+                    search_tweet_id : tweet_id,
+                    screen_name : screen_name
+                } ),
+                search_url_list = search_info.search_url_list,
+                search_parameters = search_info.search_parameters,
+                result = get_jq_link_container( search_url_list, {
+                    class_name : LINK_CONTAINER_CLASS,
+                    title : OPTIONS.LINK_TITLE,
+                    text : OPTIONS.LINK_TEXT,
+                    css : {
+                        'color' : OPTIONS.LINK_COLOR,
+                        'padding' : '4px'
+                    }
+                } ),
+                jq_link_container = result.container,
+                jq_link = result.link;
+            
+            jq_link_container.css( {
+                'display' : 'inline-block',
+                'background-color' : ( is_night_mode() ) ? '#444444' : '#ffffee',
+                'margin-left' : '16px',
+                'height' : '30px',
+                'border-radius' : '6px'
+            } );
+            
+            jq_link.css( {
+                'display' : 'inline-block',
+                'color' : ( is_night_mode() ) ? 'inherit' : '#0084b4',
+                'font-size' : '16px',
+                'font-weight' : 'bold',
+                'padding' : '0 4px',
+                'vertical-align' : 'top',
+                'line-height' : '30px'
+            } );
+            
+            set_click_handler( jq_link, function ( jq_link, event ) {
+                open_search_window( {
+                    jq_link : jq_link,
+                    event : event,
+                    search_parameters : search_parameters,
+                    child_window : null
+                } );
+                
+                return false;
+            } );
+            
+            jq_h1.append( jq_link_container );
         } );
         
-        return false;
-    } );
+        return true;
+    } // end of check_header()
     
-    var jq_h1 = $( 'h1:first' ),
-        h1_html = jq_h1.html(),
-        html_lang = $( 'html' ).attr( 'lang' );
     
-    if ( ( html_lang == LANGUAGE ) || ( ! h1_html.match( /sorry/i ) ) ) {
-        jq_h1.append( jq_link );
-    }
-    else {
-        var observer = new MutationObserver( function ( records ) {
-                var jq_h1 = $( 'h1:first' );
-                
-                if ( jq_h1.html() == h1_html ) {
-                    return;
+    var observer = new MutationObserver( function ( records ) {
+            records.forEach( function ( record ) {
+                if ( 0 < record.removedNodes.length ) {
+                    check_header( d.body );
                 }
-                jq_h1.append( jq_link_container );
                 
-                observer.disconnect();
+                to_array( record.addedNodes ).forEach( function ( addedNode ) {
+                    var jq_target = $( addedNode );
+                    if ( jq_target.hasClass( LINK_CONTAINER_CLASS ) ) {
+                        return;
+                    }
+                    check_header( addedNode );
+                } );
             } );
-        
-        observer.observe( d.body, { childList : true, subtree : true } );
-    }
+        } );
+    
+    observer.observe( d.body, { childList : true, subtree : true } );
+    
+    check_header( d.body );
     
     return true;
 
@@ -3605,6 +4266,7 @@ function initialize( user_options ) {
         check_changed_node( d.body );
         start_tweet_observer();
         start_search_tweet();
+        start_key_observer();
         
         log_debug( 'All set.' );
     } // end of start_main()
