@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.7
+// @version         0.2.6.8
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -4106,6 +4106,10 @@ function start_key_observer() {
     $( d.body )
     .on( 'keydown.main', function ( event ) {
         if ( recent_retweet_users_dialog.is_opened() ) {
+            return;
+        }
+        
+        if ( event.shiftKey || event.altKey || event.ctrlKey ) {
             return;
         }
         
