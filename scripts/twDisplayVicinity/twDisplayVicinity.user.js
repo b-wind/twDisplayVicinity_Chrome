@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.6
+// @version         0.2.6.7
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -101,7 +101,7 @@ var OPTIONS = {
     OPEN_ACT_LINK_KEYCODE : 65, // アクションの近傍ツイート検索キーコード([a]:65)
     HELP_OPEN_ACT_LINK_KEYCHAR : 'a', // アクションの近傍ツイート検索キー
     
-    TOGGLE_RERT_DIALOG_KEYCODE : 69, // {Re:RT]ダイアログを開く/閉じるキーコード([e]:69)
+    TOGGLE_RERT_DIALOG_KEYCODE : 69, // [Re:RT]ダイアログを開く/閉じるキーコード([e]:69)
     HELP_OPEN_RERT_DIALOG_KEYCHAR : 'e', // [Re:RT]ダイアログを開くキー表示
     
     STATUSES_RETWEETS_CACHE_SEC : 0, // statuses/retweets API のキャッシュを保持する時間(秒)(0:保持しない)
@@ -1558,7 +1558,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'max-height' : '100%',
                     'padding' : '0 0 0 0',
                     'overflow-y' : 'scroll',
-                    'overflow-x' : 'hidden',
+                    'overflow-x' : 'hidden'
                 } ),
                 
                 jq_shortcut_container = self.jq_shortcut_container = jq_dialog.find( '#' + SCRIPT_NAME + '-shortcut-container' ).css( {
@@ -1616,9 +1616,13 @@ var recent_retweet_users_dialog = object_extender( {
             
             self.retweeted_tweet_id = retweeted_tweet_id;
             
-            self.saved_body_overflow = $( d.body ).css( 'overflow' );
-            self.saved_body_overflow_x = $( d.body ).css( 'overflow-x' );
-            self.saved_body_overflow_y = $( d.body ).css( 'overflow-y' );
+            self.saved_body_overflow = $( d.body ).get( 0 ).style.overflow;
+            self.saved_body_overflow_x = $( d.body ).get( 0 ).style.overflowX;
+            self.saved_body_overflow_y = $( d.body ).get( 0 ).style.overflowY;
+            // $( 'body' ).css( 'overflow' ) の値を保存していると、タイムライン→個別ツイート→[Re:RT]→[Esc]→[Esc]でタイムラインに戻った時、スクロールバーが消えてしまう不具合があった
+            // ※ $( 'body' ).css( 'overflow' ) だと getComputedStyle() による値が取れてしまうため、element.style を取得したい場合には適さない
+            //   例えば、個別ツイートを開いた場合、body の class に 'overlay-enabled' が追加され、overflow:hidden 状態になるが（body.style.overflow は
+            //   変化していない）、この時、$( 'body' ).css( 'overflow' ) は "hidden" を返してくる
             
             $( d.body )
             .on( 'keypress.rert', function ( event ){
@@ -1632,7 +1636,7 @@ var recent_retweet_users_dialog = object_extender( {
                             ( 48 <= key_code && key_code <= 57 ) || // [0]-[9]
                             ( 44 <= key_code && key_code <= 47 ) || // [,][-][.][/]
                             ( 60 <= key_code && key_code <= 63 ) || // [<][=][>][?]
-                            ( keycode == 13 ) // [Enter]
+                            ( key_code == 13 ) // [Enter]
                         ) {
                             // オーバーレイ表示中は、標準のショートカットキーを無効化
                             event.stopPropagation();
@@ -2069,9 +2073,9 @@ var recent_retweet_users_dialog = object_extender( {
             
             $( d.body )
             .css( {
+                'overflow' : self.saved_body_overflow,
                 'overflow-x' : self.saved_body_overflow_x,
-                'overflow-y' : self.saved_body_overflow_y,
-                'overflow' : self.saved_body_overflow
+                'overflow-y' : self.saved_body_overflow_y
             } )
             .off( self.mouse_wheel_event_name )
             .off( 'keydown.rert' )
@@ -3223,7 +3227,7 @@ function start_search_tweet() {
             .each( function () {
                 var jq_tweet = $( this ),
                     tweet_id = jq_tweet.attr( 'data-item-id' ),
-                    tweet_time_sec = parseInt( jq_tweet.find( 'span[data-time]:first' ).attr( 'data-time' ) ),
+                    tweet_time_sec = parseInt( jq_tweet.find( 'span[data-time]:first' ).attr( 'data-time' ), 10 ),
                     retweet_id = jq_tweet.attr( 'data-retweet-id' );
                 
                 jq_tweet.addClass( SCRIPT_NAME + '_touched' );
@@ -3636,7 +3640,7 @@ function add_link_to_tweet( jq_tweet ) {
         return;
     }
     
-    var time_sec = parseInt( jq_tweet.find( 'span[data-time]:first' ).attr( 'data-time' ) ),
+    var time_sec = parseInt( jq_tweet.find( 'span[data-time]:first' ).attr( 'data-time' ), 10 ),
         search_info = get_search_info( {
             search_tweet_id : tweet_id,
             screen_name : screen_name,
@@ -3692,9 +3696,9 @@ function add_link_to_activity( jq_activity ) {
         jq_quote_tweets = jq_activity.find( 'div.js-permalink[data-item-type="tweet"]'),
         tweet_id = ( 0 < jq_tweet.length ) ? jq_tweet.attr( 'data-item-id' ) : jq_quote_tweets.attr( 'data-item-id' ),
         // TO: 引用ツイートは複数ある場合有り→暫定的に Tweet ID はそのうちの一つだけを取得
-        time_sec = parseInt( jq_timestamp.attr( 'data-time' ) ),
-        min_sec = parseInt( jq_activity.attr( 'data-activity-min-position' ) ) / 1000,
-        max_sec = parseInt( jq_activity.attr( 'data-activity-max-position' ) ) / 1000,
+        time_sec = parseInt( jq_timestamp.attr( 'data-time' ), 10 ),
+        min_sec = parseInt( jq_activity.attr( 'data-activity-min-position' ), 10 ) / 1000,
+        max_sec = parseInt( jq_activity.attr( 'data-activity-max-position' ), 10 ) / 1000,
         removed_number = jq_activity.find( 'small.' + ACT_CONTAINER_CLASS ).remove().length; // 既存のものも一旦削除（Twitterによってページが書き換えられるケースに対応
     
     log_debug( 'add_link_to_activity(): time:', time_sec, ' min:', min_sec, ' max:', max_sec, ' removed_number:', removed_number );
@@ -4298,6 +4302,8 @@ function initialize( user_options ) {
                 // TODO: Chrome 拡張機能だと false であっても Cookie が送信されてしまう
                 // → webRequest を有効にして、background.js でリクエストヘッダから Cookie を取り除くようにして対応
                 // → webRequest を無効にしていても、Cookie が送信されなくなったので、元に戻す
+                // → 0.2.6.7: 状況によっては Cookie が送出されるようなので、webRequest 有効化
+                //   ※ Cookie 内に auth_token が含まれていると、403 (code:99)が返る模様
             }
         } )
         .success( function ( json ) {

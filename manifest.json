@@ -2,7 +2,7 @@
     "manifest_version" : 2
 ,   "name" : "__MSG_ext_title__"
 ,   "short_name" : "__MSG_ext_short_name__"
-,   "version" : "0.2.6.600"
+,   "version" : "0.2.6.700"
 ,   "description" : "__MSG_ext_description__"
 ,   "author" : "furyu"
 ,   "default_locale" : "en"
@@ -26,7 +26,7 @@
     ]
 ,   "background" : {
         "scripts" : [ "scripts/background.js" ]
-    ,   "persistent": false
+    ,   "persistent": true
     }
 ,   "options_ui" : {
         "page" : "options.html"
@@ -37,5 +37,5 @@
     ,   "default_title" : "__MSG_ext_title__"
     ,   "default_popup" : "options.html"
     }
-,   "permissions": [ "*://*.twitter.com/*" ]
+,   "permissions": [ "webRequest", "webRequestBlocking", "*://*.twitter.com/*" ]
 }
