@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.8
+// @version         0.2.6.9
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -251,7 +251,9 @@ var SEARCH_API = 'https://twitter.com/search',
     
     ID_INC_PER_MSEC = Decimal.pow( 2, 22 ), // ミリ秒毎のID増分
     ID_INC_PER_SEC = ID_INC_PER_MSEC.mul( 1000 ), // 秒毎のID増分
-    ID_INC_PER_SEC_LEGACY = Math.round( 1000 * ( 29694409027 - 20 ) / ( 1288898870000 - 1142974214000 ) ), // ID 切替以前の増加分
+    FIRST_TWEET_ID = 20,
+    FIRST_TWEET_OFFSET_MSEC = 1142974214000,
+    ID_INC_PER_SEC_LEGACY = Math.round( 1000 * ( 29694409027 - FIRST_TWEET_ID ) / ( 1288898870000 - FIRST_TWEET_OFFSET_MSEC ) ), // ID 切替以前の増加分
     // TODO: ID 切替以前は増加分がわからない
     // → 暫定的に、https://twitter.com/jack/status/20 (data-time-ms: 1142974214000) → https://twitter.com/Twitter/status/29694409027 (data-time-ms: 1288898870000) の平均をとる
     
@@ -548,6 +550,16 @@ function tweet_id_to_date( tweet_id ) {
     }
     return new Date( parseInt( bignum_tweet_id.div( ID_INC_PER_MSEC ).floor().add( TWEPOCH_OFFSET_MSEC ), 10 ) );
 } // end of tweet_id_to_date()
+
+
+function tweet_id_to_date_legacy( tweet_id ) {
+    var bignum_tweet_id = new Decimal( tweet_id );
+    
+    if ( bignum_tweet_id.cmp( ID_THRESHOLD ) >= 0 ) {
+        return tweet_id_to_date( tweet_id );
+    }
+    return new Date( parseInt( bignum_tweet_id.sub( 20 ).div( ID_INC_PER_SEC_LEGACY ).mul( 1000 ).floor().add( FIRST_TWEET_OFFSET_MSEC ), 10 ) );
+} // end of tweet_id_to_date_legacy()
 
 
 function datetime_to_tweet_id( datetime ) {
@@ -1628,21 +1640,22 @@ var recent_retweet_users_dialog = object_extender( {
             .on( 'keypress.rert', function ( event ){
                 var key_code = event.which;
                 
-                switch ( key_code ) {
-                    default :
-                        if (
-                            ( 65 <= key_code && key_code <= 90 ) || // [A]-[Z]
-                            ( 97 <= key_code && key_code <= 122 ) || // [a]-[z]
-                            ( 48 <= key_code && key_code <= 57 ) || // [0]-[9]
-                            ( 44 <= key_code && key_code <= 47 ) || // [,][-][.][/]
-                            ( 60 <= key_code && key_code <= 63 ) || // [<][=][>][?]
-                            ( key_code == 13 ) // [Enter]
-                        ) {
-                            // オーバーレイ表示中は、標準のショートカットキーを無効化
-                            event.stopPropagation();
-                            event.preventDefault();
-                        }
-                        return false;
+                if (
+                    ( 65 <= key_code && key_code <= 90 ) || // [A]-[Z]
+                    ( 97 <= key_code && key_code <= 122 ) || // [a]-[z]
+                    ( 48 <= key_code && key_code <= 57 ) || // [0]-[9]
+                    ( 44 <= key_code && key_code <= 47 ) || // [,][-][.][/]
+                    ( 60 <= key_code && key_code <= 63 ) || // [<][=][>][?]
+                    ( key_code == 13 ) // [Enter]
+                ) {
+                    if ( event.altKey || event.ctrlKey ) {
+                        return;
+                    }
+                    
+                    // オーバーレイ表示中は、標準のショートカットキーを無効化
+                    event.stopPropagation();
+                    event.preventDefault();
+                    return false;
                 }
             } )
             .on( 'keydown.rert', function ( event ) {
@@ -3233,6 +3246,8 @@ function start_search_tweet() {
                 jq_tweet.addClass( SCRIPT_NAME + '_touched' );
                 
                 if ( target_tweet_id ) {
+                    log_debug( 'target_tweet_id=', target_tweet_id, 'retweet_id=', retweet_id, 'tweet_id=', tweet_id );
+                    
                     if ( retweet_id ) {
                         // リツイートの場合、tweet_id では無く、retweet_id で比較
                         if ( bignum_cmp( retweet_id, target_tweet_id ) < 0 ) {
@@ -3248,9 +3263,26 @@ function start_search_tweet() {
                     }
                 }
                 
-                if ( ( search_time_sec ) && ( tweet_time_sec <= search_time_sec ) ) {
-                    jq_target_tweet = jq_tweet;
-                    return false;
+                if ( search_time_sec ) {
+                    if ( retweet_id ) {
+                        // TODO: リツイートの場合、時刻情報を持たない→IDから時刻を割り出し（ツイートID仕様の切替以前の場合は適当）
+                        var retweet_time_sec = Math.floor( tweet_id_to_date_legacy( retweet_id ).getTime() / 1000 );
+                        
+                        log_debug( 'search_time_sec=', search_time_sec, 'retweet_time_sec=', retweet_time_sec );
+                        
+                        if ( retweet_time_sec <= search_time_sec ) {
+                            jq_target_tweet = jq_tweet;
+                            return false;
+                        }
+                    }
+                    else {
+                        log_debug( 'search_time_sec=', search_time_sec, 'tweet_time_sec=', tweet_time_sec );
+                        
+                        if ( tweet_time_sec <= search_time_sec ) {
+                            jq_target_tweet = jq_tweet;
+                            return false;
+                        }
+                    }
                 }
             } );
             
