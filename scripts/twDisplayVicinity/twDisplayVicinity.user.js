@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.9
+// @version         0.2.6.10
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -4135,6 +4135,22 @@ function search_and_click_button_on_stream_item( event, button_selector ) {
 
 
 function start_key_observer() {
+    function is_key_acceptable() {
+        var jq_active_element = $( d.activeElement );
+        
+        if ( (
+                ( ( jq_active_element.hasClass( 'tweet-box' ) ) || ( jq_active_element.attr( 'role' ) == 'textbox' ) || ( jq_active_element.attr( 'name' ) == 'tweet' ) ) &&
+                ( jq_active_element.attr( 'contenteditable' ) == 'true' )
+            ) ||
+            ( jq_active_element.prop( 'tagName' ) == 'TEXTAREA' ) ||
+            ( ( jq_active_element.prop( 'tagName' ) == 'INPUT' ) && ( jq_active_element.attr( 'type' ).toUpperCase() == 'TEXT' ) )
+        ) {
+            return false;
+        }
+        return true;
+    } // end of is_key_acceptable()
+    
+    
     $( d.body )
     .on( 'keydown.main', function ( event ) {
         if ( recent_retweet_users_dialog.is_opened() ) {
@@ -4142,6 +4158,10 @@ function start_key_observer() {
         }
         
         if ( event.shiftKey || event.altKey || event.ctrlKey ) {
+            return;
+        }
+        
+        if ( ! is_key_acceptable() ) {
             return;
         }
         
