@@ -29,7 +29,7 @@ twDisplayVicinity
 ---
 <s>[Greasemonkey](https://addons.mozilla.org/ja/firefox/addon/greasemonkey/)</s>[Tampermonkey](https://addons.mozilla.org/ja/firefox/addon/tampermonkey/)を入れたFirefox、もしくは[Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja)を入れたGoogle Chrome にて、  
 
-> [twDisplayVicinity.user.js](https://github.com/furyutei/twDisplayVicinity/raw/master/twDisplayVicinity.user.js)  
+> [twDisplayVicinity.user.js](https://furyu.atnifty.com/userjs/furyutei/twDisplayVicinity.user.js)  
 
 をクリックし、指示に従ってインストール。  
 ※ Firefox では Quantum(57) + Greasemonkey 4 より動作しなくなった（代わりに Tampermonkey を使用すること）。  
