@@ -1117,7 +1117,7 @@ var TemplateUserTimeline = {
             data.max_position = user_timeline_parameters.max_position;
             
             $.getJSON( api_endpoint.url, data )
-            .success( function ( json ) {
+            .done( function ( json ) {
                 var tweet_info_list = self.tweet_info_list,
                     min_tweet_id = self.DEFAULT_UNTIL_ID,
                     jq_html_fragment = get_jq_html_fragment( json.items_html );
@@ -1156,11 +1156,11 @@ var TemplateUserTimeline = {
                     self.timeline_status = 'search';
                 }
             } )
-            .error( function ( jqXHR, textStatus, errorThrown ) {
+            .fail( function ( jqXHR, textStatus, errorThrown ) {
                 log_error( api_endpoint.url, textStatus );
                 self.timeline_status = 'error';
             } )
-            .complete( function () {
+            .always( function () {
                 callback();
             } );
         }, // end of __get_next_user_timeline()
@@ -1182,7 +1182,7 @@ var TemplateUserTimeline = {
             api_data.max_position = search_timeline_parameters.api_max_position;
             
             $.getJSON( api_endpoint.url, api_data )
-            .success( function ( json ) {
+            .done( function ( json ) {
                 var tweet_info_list = self.tweet_info_list,
                     json_inner = ( json.inner ) ? json.inner : ( ( json.items_html && json.min_position ) ? json : null );
                     // items_html/min_position が json.inner ではなく、json 直下にある場合もある（未ログイン時など）
@@ -1231,11 +1231,11 @@ var TemplateUserTimeline = {
                 //}
                 //}
             } )
-            .error( function ( jqXHR, textStatus, errorThrown ) {
+            .fail( function ( jqXHR, textStatus, errorThrown ) {
                 log_error( api_endpoint.url, textStatus );
                 self.timeline_status = 'error';
             } )
-            .complete( function () {
+            .always( function () {
                 callback();
             } );
             
@@ -1269,7 +1269,7 @@ var TemplateUserTimeline = {
                 data : html_data,
                 dataType : 'html'
             } )
-            .success( function ( html ) {
+            .done( function ( html ) {
                 var jq_html_fragment = get_jq_html_fragment( html ),
                     tweet_info_list = self.tweet_info_list,
                     api_max_position = search_timeline_parameters.api_max_position = jq_html_fragment.find( '*[data-min-position]' ).attr( 'data-min-position' );
@@ -1302,11 +1302,11 @@ var TemplateUserTimeline = {
                     tweet_info_list.push( tweet_info );
                 } );
             } )
-            .error( function ( jqXHR, textStatus, errorThrown ) {
+            .fail( function ( jqXHR, textStatus, errorThrown ) {
                 log_error( html_endpoint.url, textStatus );
                 self.timeline_status = 'error';
             } )
-            .complete( function () {
+            .always( function () {
                 callback();
             } );
             
@@ -2130,7 +2130,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'Authorization' : 'Bearer ' + OAUTH2_ACCESS_TOKEN
                 }
             } )
-            .success( function ( retweet_user_info_list ) {
+            .done( function ( retweet_user_info_list ) {
                 if ( request_id != self.current_request_id ) {
                     callback( request_id, 'ignore', retweet_user_info_list );
                     return;
@@ -2145,11 +2145,11 @@ var recent_retweet_users_dialog = object_extender( {
                 
                 callback( request_id, 'ok', retweet_user_info_list );
             } )
-            .error( function ( jqXHR, textStatus, errorThrown ) {
+            .fail( function ( jqXHR, textStatus, errorThrown ) {
                 log_error( statuses_retweets_url, textStatus );
                 callback( request_id, 'load error: ' + textStatus, null );
             } )
-            .complete( function () {
+            .always( function () {
             } );
             
             return self;
@@ -2537,7 +2537,7 @@ var recent_retweet_users_dialog = object_extender( {
                     }
                     
                     $.get( iframe_url )
-                    .success( function ( html ) {
+                    .done( function ( html ) {
                         var jq_html_fragment = get_jq_html_fragment( html ),
                             found_thumb_url = jq_html_fragment.find( 'img[data-src]' ).attr( 'data-src' ),
                             thumb_url = ( found_thumb_url ) ? found_thumb_url : 'https://ton.twimg.com/tfw/assets/news_stroke_v1_78ce5b21fb24a7c7e528d22fc25bd9f9df7f24e2.svg',
@@ -4362,20 +4362,20 @@ function initialize( user_options ) {
                 //   ※ Cookie 内に auth_token が含まれていると、403 (code:99)が返る模様
             }
         } )
-        .success( function ( json ) {
+        .done( function ( json ) {
             OAUTH2_ACCESS_TOKEN = json.access_token;
             if ( OPTIONS.CACHE_OAUTH2_ACCESS_TOKEN ) {
                 set_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN', OAUTH2_ACCESS_TOKEN );
             }
         } )
-        .error( function ( jqXHR, textStatus, errorThrown ) {
+        .fail( function ( jqXHR, textStatus, errorThrown ) {
             log_error( OAUTH2_TOKEN_API_URL, textStatus );
             // TODO: Cookies 中に auth_token が含まれていると、403 (code:99)が返ってきてしまう
             // → auth_token は Twitter ログイン中保持されるため、Cookies を送らないようにする対策が取れない場合、対応は困難
             OAUTH2_ACCESS_TOKEN = null;
             set_value( SCRIPT_NAME + '_OAUTH2_ACCESS_TOKEN', '' );
         } )
-        .complete( function () {
+        .always( function () {
             start_main();
         } );
     } // end of get_access_token()
@@ -4395,18 +4395,18 @@ function initialize( user_options ) {
                 'Authorization' : 'Bearer ' + OAUTH2_ACCESS_TOKEN
             }
         } )
-        .success( function ( json ) {
+        .done( function ( json ) {
             if ( ( ! json ) || ( ! json.rate_limit_context ) || ( ! json.resources ) || ( ! json.resources.statuses ) ) {
                 get_access_token();
                 return;
             }
             start_main();
         } )
-        .error( function ( jqXHR, textStatus, errorThrown ) {
+        .fail( function ( jqXHR, textStatus, errorThrown ) {
             log_debug( API_RATE_LIMIT_STATUS, textStatus );
             get_access_token();
         } )
-        .complete( function () {
+        .always( function () {
         } );
     }
     else {
