@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.10
+// @version         0.2.6.11
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -1489,7 +1489,8 @@ var recent_retweet_users_dialog = object_extender( {
                     'bottom' : '0',
                     'left' : '0',
                     'overflow' : 'auto',
-                    'z-index' : '3000',
+                    //'z-index' : '3000',
+                    'z-index' : '1010', // プロフィールのポップアップ表示(z-index:1011)よりも奥にする
                     'background' : 'rgba( 0, 0, 0, 0.8 )'
                 } )
                 .on( 'click', function ( event ) {
@@ -1606,7 +1607,10 @@ var recent_retweet_users_dialog = object_extender( {
             
             jq_dialog_container.hide();
             
-            $( 'body' ).append( jq_dialog_container );
+            //$( 'body' ).append( jq_dialog_container );
+            //$( '#timeline' ).append( jq_dialog_container ); // div#timeline 下に挿入することで、プロフィールポップアップが自動的に機能する
+            // TODO: このタイミングで挿入すると、ページ遷移（ホーム→個別など）の際に消されてしまう
+            // → open() が呼ばれたときに逐次挿入
             
             self.current_request_id = 0;
             self.mouse_wheel_event_name = ( 'onwheel' in d ) ? 'wheel' : ( ( 'onmousewheel' in d ) ? 'mousewheel' : 'DOMMouseScroll' );
@@ -1625,6 +1629,8 @@ var recent_retweet_users_dialog = object_extender( {
                 jq_user_list = self.jq_user_list,
                 jq_shortcut_container = self.jq_shortcut_container,
                 stream_item_cursor = self.stream_item_cursor = self.__get_stream_item_cursor();
+            
+            $( '#timeline' ).append( jq_dialog_container ); // div#timeline 下に挿入することで、プロフィールポップアップが自動的に機能する
             
             self.retweeted_tweet_id = retweeted_tweet_id;
             
@@ -2033,7 +2039,7 @@ var recent_retweet_users_dialog = object_extender( {
                     .append( jq_close_all_button_wrapper )
                     .append( jq_open_all_button_wrapper )
                     .append( jq_help_button_wrapper );
-                } // end of check_complete()
+                } // end of check_all_images_loaded()
                 
                 
                 retweet_user_info_list.forEach( function( retweet_user_info ) {
@@ -3458,7 +3464,11 @@ function add_container_to_tweet( jq_tweet, jq_link_container ) {
     }
     jq_tweet.find( 'div.client-and-actions span.metadata:first' ).after( jq_link_container.clone( true ) );
     if ( jq_insert_point.next().hasClass( 'follow-bar' ) ) {
-        jq_link_container.css( 'margin-right','12px' );
+        //jq_link_container.css( 'margin-right','12px' );
+        jq_link_container.css( 'margin-right', '24px' );
+        if ( OPTIONS.USE_LINK_ICON ) {
+            jq_link_container.css( 'transform', 'scale(2.0,2.0)' );
+        }
     }
     jq_insert_point.after( jq_link_container );
 } // end of add_container_to_tweet()
