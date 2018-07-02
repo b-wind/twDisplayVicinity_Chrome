@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.11
+// @version         0.2.6.12
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -722,7 +722,7 @@ function get_screen_name_from_url( url ) {
     }
     
     return RegExp.$1;
-} // end of parse_individual_tweet_url()
+} // end of get_screen_name_from_url()
 
 
 function parse_individual_tweet_url( tweet_url ) {
@@ -1490,7 +1490,7 @@ var recent_retweet_users_dialog = object_extender( {
                     'left' : '0',
                     'overflow' : 'auto',
                     //'z-index' : '3000',
-                    'z-index' : '1010', // プロフィールのポップアップ表示(z-index:1011)よりも奥にする
+                    'z-index' : '1011', // プロフィールのポップアップ表示(z-index:1011)が表示され、個別ツイート(z-index:1010)に隠されないように
                     'background' : 'rgba( 0, 0, 0, 0.8 )'
                 } )
                 .on( 'click', function ( event ) {
@@ -1628,9 +1628,11 @@ var recent_retweet_users_dialog = object_extender( {
                 jq_loading = self.jq_loading,
                 jq_user_list = self.jq_user_list,
                 jq_shortcut_container = self.jq_shortcut_container,
-                stream_item_cursor = self.stream_item_cursor = self.__get_stream_item_cursor();
+                stream_item_cursor = self.stream_item_cursor = self.__get_stream_item_cursor(),
+                jq_timeline = $( '#timeline' );
             
-            $( '#timeline' ).append( jq_dialog_container ); // div#timeline 下に挿入することで、プロフィールポップアップが自動的に機能する
+            ( ( 0 < jq_timeline.length ) ? jq_timeline : $( 'body' ) ).append( jq_dialog_container ); // div#timeline 下に挿入することで、プロフィールポップアップが自動的に機能する
+            // TODO: div#timeline が存在しないケース（個別ツイートを単独で表示した場合等）は対応できない
             
             self.retweeted_tweet_id = retweeted_tweet_id;
             
@@ -3463,9 +3465,10 @@ function add_container_to_tweet( jq_tweet, jq_link_container ) {
         jq_insert_point = jq_tweet.find( 'small.time:first' );
     }
     jq_tweet.find( 'div.client-and-actions span.metadata:first' ).after( jq_link_container.clone( true ) );
-    if ( jq_insert_point.next().hasClass( 'follow-bar' ) ) {
-        //jq_link_container.css( 'margin-right','12px' );
+    
+    if ( jq_insert_point.next().hasClass( 'follow-bar' ) || jq_tweet.hasClass( 'js-initial-focus' ) ) {
         jq_link_container.css( 'margin-right', '24px' );
+        
         if ( OPTIONS.USE_LINK_ICON ) {
             jq_link_container.css( 'transform', 'scale(2.0,2.0)' );
         }
