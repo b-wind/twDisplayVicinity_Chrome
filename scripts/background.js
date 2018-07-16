@@ -41,6 +41,28 @@ chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse )
 
 
 // WebRequest
+// ※ Firefox 61.0.1 で、content_scripts で $.ajax() を読んだ際、Referer が設定されない不具合に対応
+chrome.webRequest.onBeforeSendHeaders.addListener(
+    function ( details ) {
+        var requestHeaders = details.requestHeaders,
+            referer;
+        
+        if ( ! requestHeaders.some( ( element ) => ( element.name.toLowerCase() == 'referer' ) ) ) {
+            referer = details.documentUrl || 'https://twitter.com';
+            
+            requestHeaders.push( {
+                name : 'Referer',
+                value : referer,
+            } );
+        }
+        
+        return { requestHeaders: requestHeaders };
+    }
+,   { urls : [ '*://twitter.com/*' ] }
+,   [ 'blocking', 'requestHeaders' ]
+);
+
+
 // ※ OAuth2 の token 取得時に Cookie を送信しないようにする
 // ※有効にする場合は、 manifest.json に
 //   "permissions": [ "webRequest", "webRequestBlocking", "*://*.twitter.com/*" ]
