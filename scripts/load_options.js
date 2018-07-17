@@ -111,6 +111,15 @@ var twDisplayVicinity_chrome_init = ( function() {
     return get_init_function( 'GET_OPTIONS', option_name_to_function_map );
 } )(); // end of twDisplayVicinity_chrome_init()
 
+
+if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'function' ) ) {
+    jQuery.ajaxSettings.xhr = function () {
+        try {
+            return new content.XMLHttpRequest();
+        } catch ( e ) {}
+    };
+}
+
 w.is_web_extension = true;
 w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
 
