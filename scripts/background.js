@@ -82,7 +82,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         return { requestHeaders: requestHeaders };
     },
     { urls : [ '*://api.twitter.com/oauth2/token' ] },
-    [ 'blocking', 'requestHeaders' ]
+    [ 'blocking', 'requestHeaders', 'extraHeaders' ]
 );
 
 } )( window, document );
