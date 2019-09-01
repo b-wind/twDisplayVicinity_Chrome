@@ -2,7 +2,7 @@
 // @name            twDisplayVicinity
 // @namespace       http://d.hatena.ne.jp/furyu-tei
 // @author          furyu
-// @version         0.2.6.12
+// @version         0.2.6.13
 // @include         https://twitter.com/*
 // @require         https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js
 // @require         https://cdnjs.cloudflare.com/ajax/libs/decimal.js/7.3.0/decimal.min.js
@@ -118,8 +118,13 @@ var SCRIPT_NAME = 'twDisplayVicinity',
     
     DEBUG = false;
 
-
 //{ check environment
+if ( d.querySelector( 'div#react-root' ) ) {
+    // TODO: Twitter 新UI(React版) には未対応
+    console.error( SCRIPT_NAME + ': Not compatible with React Twitter' );
+    return;
+}
+
 if ( w[ SCRIPT_NAME + '_touched' ] ) {
     return;
 }
@@ -856,7 +861,7 @@ function is_search_mode() {
 
 
 function is_night_mode() {
-    return ( $( '#user-dropdown .js-nightmode-icon' ).hasClass( 'Icon--crescentFilled' ) || $( 'html' ).hasClass( 'night_mode' ) );
+    return ( $( '#user-dropdown .js-nightmode-icon' ).hasClasses( [ 'Icon--lightBulbOff', 'Icon--crescentFilled' ], true ) || $( 'html' ).hasClass( 'night_mode' ) );
 } // end of is_night_mode()
 
 
