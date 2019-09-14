@@ -10,32 +10,24 @@ w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : 
 var OPTIONS = {
     USE_SEARCH_TL_BY_DEFAULT : false, // true: デフォルトで検索タイムラインを使用
     
-    HOUR_BEFORE : 24, // 対象ツイートから遡る期間(時間)
-    //HOUR_AFTER : 8, // 対象ツイートより後の期間(時間)
     HOUR_AFTER : 3, // 対象ツイートより後の期間(時間)
-    
-    // DAY_BEFORE / DAY_AFTER は、検索タイムラインで  until: / since: が "YYYY-MM-DD_hh:mm:ss_GMT" の形で指定できることが判明したので未使用とする
-    DAY_BEFORE : 1, // (未使用) 対象ツイートから遡る期間(日)(検索タイムライン用・時間指定時)
-    DAY_AFTER : 1, // (未使用) 対象ツイートより後の期間(日)(検索タイムライン用・時間指定時)
-    
-    IGNORE_SINCE : true, // true: 検索タイムラインのオプションに since: を付けない
     
     TARGET_TWEET_COLOR : 'gold', // 対象ツイートの色
     TARGET_TWEET_COLOR_NIGHTMODE : '#444400', // 対象ツイートの色（夜間モード）
     VICINITY_TWEET_COLOR : 'pink', // 近傍ツイートの色
     VICINITY_TWEET_COLOR_NIGHTMODE : '#440044', // 近傍ツイートの色（夜間モード）
-    // TODO: 夜間モードだと見えにくいため、暫定的に 'inherit' にしてある
-    LINK_COLOR : 'inherit', // 近傍リンクの色('darkblue'→'inherit')
-    ACT_LINK_COLOR : 'inherit', // 通知リンクの色('indigo'→'inherit')
     
-    HIDE_NEWER_TWEETS : true, // true: 最新のツイート(追加されたもの)を非表示
-    USE_LINK_ICON : true, // 近傍リンクの種類（true: アイコンを使用 ／ false: 文字を使用
+    USE_LINK_ICON : true, // 近傍リンクの種類（true: アイコンを使用 ／ false: 文字を使用(未対応)
+    //LINK_COLOR : 'inherit', // 近傍リンクの色('darkblue'→'inherit')
+    //ACT_LINK_COLOR : 'inherit', // 通知リンクの色('indigo'→'inherit')
+    //※文字リンクは未対応（レイアウトが難しいため）
     
-    ENABLE_RECENT_RETWEET_USERS_BUTTON : true, // true: 最近リツイートしたユーザーを表示するボタンを有効に
-    CACHE_OAUTH2_ACCESS_TOKEN : true, // true: OAuth2 の Access Token を再利用する
+    ENABLE_RECENT_RETWEET_USERS_BUTTON : true, // true: [Re:RT]（最近リツイートしたユーザーを表示するボタン）を有効に
+    
     MAX_USER_NUMBER : 30, // 取得ユーザー数(API制限により、100ユーザまで) (ENABLE_RECENT_RETWEET_USERS_BUTTON が true の場合に使用)
     MAX_AFTER_RETWEET_MINUTES : 10, // リツイート後のツイート取得期間(分)
     MAX_BEFORE_RETWEET_MINUTES : 10, // リツイート前のツイート取得時間(分)
+    // TODO: 元々のの「リツイートしたユーザー」ダイアログを利用しているため、未使用
     
     OPEN_LINK_KEYCODE : 70, // 近傍ツイート検索キーコード([f]:70)
     HELP_OPEN_LINK_KEYCHAR : 'f', // 近傍ツイート検索キー表示
@@ -45,8 +37,9 @@ var OPTIONS = {
     
     TOGGLE_RERT_DIALOG_KEYCODE : 69, // [Re:RT]ダイアログを開く/閉じるキーコード([e]:69)
     HELP_OPEN_RERT_DIALOG_KEYCHAR : 'e', // [Re:RT]ダイアログを開くキー表示
+    // TODO: [Re:RT] のダイアログで同一タブ上に前後ツイートを表示する機能は未実装
     
-    STATUSES_RETWEETS_CACHE_SEC : 0, // statuses/retweets API のキャッシュを保持する時間(秒)(0:保持しない)
+    STATUSES_RETWEETS_CACHE_SEC : 10, // statuses/retweets API のキャッシュを保持する時間(秒)(0:保持しない)
     
     OBSERVE_DOM_FETCH_DATA : false, // true: fetch wrapper で取得した内容を DOM 要素に書き出し、MutationObserver で監視
     
@@ -167,19 +160,11 @@ switch ( LANGUAGE ) {
         break;
 }
 
-var SEARCH_API = 'https://twitter.com/search',
-    TIMELINE_API_BASE = 'https://twitter.com/',
-    //OAUTH2_TOKEN_API_URL = 'https://api.twitter.com/oauth2/token',
-    //ENCODED_TOKEN_CREDENTIAL = 'ZUMwYjVTcDdTTW0xaUtES3lwQ3AySkpkZDpsbHMxZ040Q0ZQMFhmSmtvbEk2UjBZMkd6aWxjbHhqQUlrZkVZSHl3Ymh6TjhZcURlSA==',
-    API_RATE_LIMIT_STATUS = 'https://api.twitter.com/1.1/application/rate_limit_status.json',
-    API_STATUSES_RETWEETS_TEMPLATE = 'https://api.twitter.com/1.1/statuses/retweets/#TWEETID#.json?count=#NUMBER#',
-    API_FAVORITES_LIST_TEMPLATE = 'https://api.twitter.com/1.1/favorites/list.json?screen_name=#SCREEN_NAME#&count=200&include_entities=true',
-        // TODO: 「いいね」の方は API の仕様上、使い勝手がよくないため、保留
-    OAUTH2_ACCESS_TOKEN = null,
-    
-    API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
+var API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
     // TODO: 継続して使えるかどうか不明→変更された場合の対応を要検討
     // ※ https://abs.twimg.com/responsive-web/web/main.<version>.js (例：https://abs.twimg.com/responsive-web/web/main.007c24006b6719434.js) 内で定義されている値
+    // ※ これを使用しても、一定時間内のリクエスト回数に制限有り→参考；[TwitterのAPI制限 [2019/05/31現在] - Qiita](https://qiita.com/mpyw/items/32d44a063389236c0a65)
+    API_STATUSES_RETWEETS_TEMPLATE = 'https://api.twitter.com/1.1/statuses/retweets/#TWEET_ID#.json?count=#COUNT#',
     API_USER_TIMELINE_TEMPLATE = 'https://api.twitter.com/1.1/statuses/user_timeline.json?count=#COUNT#&include_my_retweet=1&include_rts=1&user_id=#USER_ID#&cards_platform=Web-13&include_entities=1&include_user_entities=1&include_cards=1&send_error_codes=1&tweet_mode=extended&include_ext_alt_text=true&include_reply_count=true',
     
     
@@ -191,9 +176,6 @@ var SEARCH_API = 'https://twitter.com/search',
     TARGET_TWEET_CLASS = SCRIPT_NAME + '-target-tweet',
     VICINITY_TWEET_CLASS = SCRIPT_NAME + '-vicinity-tweet',
     
-    //INTV_CHECK_MS = 300, // チェック間隔(単位：ms)
-    //MAX_CHECK_RETRY = 10, // 'div.stream-end' 要素が表示されてから、チェックを終了するまでのリトライ回数(タイミングにより、いったん表示されてもまた消える場合がある)
-    
     WAIT_DOM_REFRESH_MS = 100, // 通信データ通知→DOM更新待ち時間(単位：ms)
     WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
     
@@ -203,10 +185,12 @@ var SEARCH_API = 'https://twitter.com/search',
     
     LIMIT_STATUSES_RETWEETS_USER_NUMBER = 100, // statuses/retweets のユーザー数制限
     DEFAULT_STATUSES_RETWEETS_USER_NUMBER = 30, // statuses/retweets のデフォルトユーザー数
+    
     LIMIT_MAX_AFTER_RETWEET_MINUTES = 60, // リツイート後のツイート取得時間(分)制限
     DEFAULT_MAX_AFTER_RETWEET_MINUTES = 10, // リツイート後のツイート取得時間(分)デフォルト
     LIMIT_MAX_BEFORE_RETWEET_MINUTES = 60, // リツイート前のツイート取得時間(分)制限
     DEFAULT_MAX_BEFORE_RETWEET_MINUTES = 10, // リツイート前のツイート取得時間(分)デフォルト
+    // TODO: [Re:RT] のダイアログで同一タブ上に前後ツイートを表示する機能は未実装
     
     ID_INC_PER_MSEC = Decimal.pow( 2, 22 ), // ミリ秒毎のID増分
     ID_INC_PER_SEC = ID_INC_PER_MSEC.mul( 1000 ), // 秒毎のID増分
@@ -223,6 +207,12 @@ var SEARCH_API = 'https://twitter.com/search',
     ID_AFTER = null,
     ID_BEFORE_LEGACY = null,
     ID_AFTER_LEGACY = null,
+    
+    CURRENT_REFERENCE_TO_RETWEETERS_INFO = {
+        status : 'idle', // 'idle', 'wait_dialog', 'dialog_displayed'
+        tweet_id : null,
+        url_to_return : null,
+    },
     
     LINK_ICON_URL = [ // アイコン(48×48)
         'data:image/gif;base64,',
@@ -397,28 +387,6 @@ $.fn.hasClasses = function( selector, or_flag ) {
     }
     return false;
 }; // end of $.fn.hasClasses()
-
-
-function is_error_page() {
-    return ( 0 < $( 'div[data-testid="primaryColumn"] h1[role="heading"][data-testid="error-detail"]' ).length );
-} // end of is_error_page()
-
-
-function is_night_mode() {
-    return ( getComputedStyle( d.body ).backgroundColor != 'rgb(255, 255, 255)' );
-} // end of is_night_mode()
-
-
-function is_search_mode() {
-    var initial_search_url = SEARCH_PARAMETERS.initial_search_url;
-    
-    return ( ( initial_search_url ) && ( location.href == initial_search_url ) );
-} // end of is_search_mode()
-
-
-function update_display_mode() {
-    $( d.body ).attr( 'data-nightmode', is_night_mode() );
-} // end of update_display_mode()
 
 
 // 参考: [日付フォーマットなど 日付系処理 - Qiita](http://qiita.com/osakanafish/items/c64fe8a34e7221e811d0)
@@ -674,28 +642,141 @@ function get_screen_name_from_url( url ) {
 } // end of get_screen_name_from_url()
 
 
-function parse_individual_tweet_url( tweet_url ) {
-    if ( ! tweet_url ) {
-        tweet_url = location.href;
-    }
+function is_error_page() {
+    return ( 0 < $( 'div[data-testid="primaryColumn"] h1[role="heading"][data-testid="error-detail"]' ).length );
+} // end of is_error_page()
+
+
+function is_night_mode() {
+    return ( getComputedStyle( d.body ).backgroundColor != 'rgb(255, 255, 255)' );
+} // end of is_night_mode()
+
+
+function is_search_mode() {
+    var initial_search_url = SEARCH_PARAMETERS.initial_search_url;
     
-    try {
-        tweet_url = new URL( tweet_url, d.baseURI ).href;
-    }
-    catch( error ) {
-        tweet_url = '';
-    }
+    return ( ( initial_search_url ) && ( location.href == initial_search_url ) );
+} // end of is_search_mode()
+
+
+function update_display_mode() {
+    $( d.body ).attr( 'data-nightmode', is_night_mode() );
+} // end of update_display_mode()
+
+
+function is_reacted_event_element( event_element ) {
+    return /^users?_(retweet|like)/.test( event_element );
+} // end of is_reacted_event_element()
+
+
+function is_retweeted_event_element( event_element ) {
+    return /^users?_retweet/.test( event_element );
+} // end of is_retweeted_event_element()
+
+
+function is_liked_event_element( event_element ) {
+    return /^users?_like/.test( event_element );
+} // end of is_liked_event_element()
+
+
+var is_tweet_retweeters_url = ( () => {
+    var reg_retweeter_list_url = /^https?:\/\/([^\/]+)?\/([^\/]+)\/status(?:es)?\/(\d+)\/retweets/;
     
-    if ( ! tweet_url.match( /^(?:https?:\/\/[^\/]+)?\/([^\/]+)\/status(?:es)?\/(\d+)/ ) ) {
-        return null;
-    }
-    
-    return {
-        screen_name : RegExp.$1,
-        tweet_id : RegExp.$2,
-        tweet_url : tweet_url
+    return ( tweet_url ) => {
+        if ( ! tweet_url ) {
+            tweet_url = location.href;
+        }
+        return reg_retweeter_list_url.test( tweet_url );
     };
-} // end of parse_individual_tweet_url()
+} )(); // end of is_tweet_retweeters_url()
+
+
+var parse_individual_tweet_url = ( () => {
+    var reg_tweet_url = /^(?:https?:\/\/[^\/]+)?\/([^\/]+)\/status(?:es)?\/(\d+)/;
+    
+    return ( tweet_url ) => {
+        if ( ! tweet_url ) {
+            tweet_url = location.href;
+        }
+        
+        try {
+            tweet_url = new URL( tweet_url, d.baseURI ).href;
+        }
+        catch( error ) {
+            tweet_url = '';
+        }
+        
+        if ( ! tweet_url.match( reg_tweet_url ) ) {
+            return null;
+        }
+        
+        return {
+            screen_name : RegExp.$1,
+            tweet_id : RegExp.$2,
+            tweet_url : tweet_url
+        };
+    };
+} )(); // end of parse_individual_tweet_url()
+
+
+function get_retweeter_link( $tweet ) {
+    //return $tweet.find( 'a[role="link"]:not([href^="/i/"]):has(>span>span[dir="ltr"]>span)' ); // ←だと、自分自身がリツイートした場合に合致しない
+    return $tweet.find( 'a[role="link"]:not([href^="/i/"]):has(>span>span)' );
+} // end of get_retweeter_link()
+
+
+function get_retweeter_screen_name( $tweet ) {
+    return ( get_retweeter_link( $tweet ).attr( 'href' ) || '' ).replace( /^\//, '' );
+} // end of get_retweeter_screen_name()
+
+
+var get_shortcut_keys = ( () => {
+    var shortcut_keys = null;
+    
+    return () => {
+        if ( shortcut_keys ) {
+            return shortcut_keys;
+        }
+        
+        try {
+            shortcut_keys = JSON.parse( $( 'div[data-at-shortcutkeys]' ).attr( 'data-at-shortcutkeys' ) );
+        }
+        catch ( error ) {
+            shortcut_keys = null;
+            return {};
+        }
+        return shortcut_keys;
+    };
+} )(); // end of get_shortcut_keys()
+
+
+function get_event_element_from_title( title ) {
+    // TODO: https://twitter.com/i/timeline のページ種別（「リツイートされました」「いいねされました」等）判別が困難（多国語対応のため）
+    // →暫定的に、キーボードショートカットを元に、document.title に一致するものを探して判別
+    // → /2/notifications/all.json で取得された title が document.title のものと一致するかによってイベント種別を判別できるようになったため、get_event_element_from_title() は現状未使用
+    
+    if ( ! title ) {
+        title = d.title;
+    }
+    
+    var retweet_string = get_shortcut_keys()[ 't' ],
+        like_string = get_shortcut_keys()[ 'l' ];
+    
+    if ( ( ! retweet_string ) || ( ! like_string ) ) {
+        return 'unknown_event';
+    }
+    
+    if ( title.match( retweet_string ) ) {
+        return 'user_retweeted_tweet';
+    }
+    else if ( title.match( like_string ) ) {
+        return 'user_liked_tweet';
+    }
+    else {
+        return 'unknown_event';
+    }
+    
+} // end of get_event_element_from_title()
 
 
 function api_get_csrf_token() {
@@ -768,81 +849,6 @@ var open_child_window = ( () => {
 } )(); // end of open_child_window()
 
 
-var get_shortcut_keys = ( () => {
-    var shortcut_keys = null;
-    
-    return () => {
-        if ( shortcut_keys ) {
-            return shortcut_keys;
-        }
-        
-        try {
-            shortcut_keys = JSON.parse( $( 'div[data-at-shortcutkeys]' ).attr( 'data-at-shortcutkeys' ) );
-        }
-        catch ( error ) {
-            shortcut_keys = null;
-            return {};
-        }
-        return shortcut_keys;
-    };
-} )(); // end of get_shortcut_keys()
-
-
-function get_event_element_from_title( title ) {
-    // TODO: https://twitter.com/i/timeline のページ種別（「リツイートされました」「いいねされました」等）判別が困難（多国語対応のため）
-    // →暫定的に、キーボードショートカットを元に、document.title に一致するものを探して判別
-    // → /2/notifications/all.json で取得された title が document.title のものと一致するかによってイベント種別を判別できるようになったため、get_event_element_from_title() は現状未使用
-    
-    if ( ! title ) {
-        title = d.title;
-    }
-    
-    var retweet_string = get_shortcut_keys()[ 't' ],
-        like_string = get_shortcut_keys()[ 'l' ];
-    
-    if ( ( ! retweet_string ) || ( ! like_string ) ) {
-        return 'unknown_event';
-    }
-    
-    if ( title.match( retweet_string ) ) {
-        return 'user_retweeted_tweet';
-    }
-    else if ( title.match( like_string ) ) {
-        return 'user_liked_tweet';
-    }
-    else {
-        return 'unknown_event';
-    }
-    
-} // end of get_event_element_from_title()
-
-
-function is_reacted_event_element( event_element ) {
-    return /^users?_(retweet|like)/.test( event_element );
-} // end of is_reacted_event_element()
-
-
-function is_retweeted_event_element( event_element ) {
-    return /^users?_retweet/.test( event_element );
-} // end of is_retweeted_event_element()
-
-
-function is_liked_event_element( event_element ) {
-    return /^users?_like/.test( event_element );
-} // end of is_liked_event_element()
-
-
-function get_retweeter_link( $tweet ) {
-    //return $tweet.find( 'a[role="link"]:not([href^="/i/"]):has(>span>span[dir="ltr"]>span)' ); // ←だと、自分自身がリツイートした場合に合致しない
-    return $tweet.find( 'a[role="link"]:not([href^="/i/"]):has(>span>span)' );
-} // end of get_retweeter_link()
-
-
-function get_retweeter_screen_name( $tweet ) {
-    return ( get_retweeter_link( $tweet ).attr( 'href' ) || '' ).replace( /^\//, '' );
-} // end of get_retweeter_screen_name()
-
-
 var open_search_window = ( () => {
     var user_timeline_url_template = 'https://twitter.com/#SCREEN_NAME#/with_replies?max_id=#MAX_ID#',
         search_query_template = 'from:#SCREEN_NAME# until:#GMT_DATETIME# include:retweets include:nativeretweets',
@@ -881,6 +887,7 @@ var open_search_window = ( () => {
             log_debug( 'fetch_user_timeline() json:', json );
             
             if ( ( ! Array.isArray( json ) ) || ( json.length <= 0 ) ) {
+                search_parameters.use_user_timeline = false;
                 open_search_page();
                 return;
             }
@@ -896,13 +903,9 @@ var open_search_window = ( () => {
         } )
         .catch( ( error ) => {
             log_error( 'fetch_user_timeline() error:', error );
+            search_parameters.use_user_timeline = false;
             open_search_page();
         } );
-        
-        // TODO: 現状別窓で https://twitter.com/search を開いて検索しており、
-        // - 全てのツイートが対象となるとは限らない
-        // - リツイートは一定期間以前のものは対象とならない
-        // 問題あり
     };
 } )(); // end of open_search_window()
 
@@ -975,7 +978,27 @@ var create_vicinity_link_container = ( function () {
             var act_screen_name = $link.attr( 'data-act_screen_name' ) || '',
                 event_element = $link.attr( 'data-event_element' ) || '',
                 tweet_id = $link.attr( 'data-self_tweet_id' ),
-                reacted_tweet_info = get_reacted_tweet_info( tweet_id );
+                reacted_tweet_info = get_reacted_tweet_info( tweet_id ),
+                target_info = {};
+            
+            if ( ! reacted_tweet_info ) {
+                reacted_tweet_info = {
+                    id : tweet_id,
+                    rt_info_map : {},
+                    like_info_map : {},
+                    screen_name : $link.attr( 'data-self_screen_name' ),
+                    timestamp_ms : 1 * $link.attr( 'data-timestamp_ms' ),
+                };
+                
+                Object.assign( target_info, reacted_tweet_info );
+                
+                open_search_window( {
+                    use_user_timeline : ! ( OPTIONS.USE_SEARCH_TL_BY_DEFAULT ^ ( event.shiftKey || event.altKey || event.ctrlKey ) ),
+                    reacted_tweet_info : reacted_tweet_info,
+                    target_info : target_info,
+                } );
+                return;
+            }
             
             if ( reacted_tweet_info.reacted_id ) {
                 // リツイート／いいね情報は元ツイートに格納されているので差し替え
@@ -986,7 +1009,6 @@ var create_vicinity_link_container = ( function () {
             
             var reacted_info_map = ( is_retweeted_event_element( event_element ) ) ? reacted_tweet_info.rt_info_map : reacted_tweet_info.like_info_map,
                 reacted_info = reacted_info_map.screen_name_map[ act_screen_name ] || {},
-                target_info = {},
                 search_parameters = {
                     use_user_timeline : ! ( OPTIONS.USE_SEARCH_TL_BY_DEFAULT ^ ( event.shiftKey || event.altKey || event.ctrlKey ) ),
                     act_screen_name : act_screen_name,
@@ -1007,6 +1029,8 @@ var create_vicinity_link_container = ( function () {
                     user_name :reacted_tweet_info.user_name,
                 } );
             }
+            
+            log_debug( 'search_parameters:', search_parameters );
             
             open_search_window( search_parameters );
         } );
@@ -1034,10 +1058,22 @@ var create_recent_retweet_users_button = ( () => {
             event.stopPropagation();
             event.preventDefault();
             
-            // TODO: ＠＠＠ 制作中 ＠＠＠
-            //recent_retweet_users_dialog.open( tweet_id );
+            // TODO: [Re:RT] で同一タブ上で RT 前後のツイートを表示する機能は未実装
             
-            $recent_retweet_users_button.parents( 'article[role="article"]:first' ).click();
+            var $ancestor = $recent_retweet_users_button_container.parents( 'article[role="article"]:first' );
+            
+            if ( CURRENT_REFERENCE_TO_RETWEETERS_INFO.status == 'idle' ) {
+                CURRENT_REFERENCE_TO_RETWEETERS_INFO.url_to_return = location.href;
+            }
+            CURRENT_REFERENCE_TO_RETWEETERS_INFO.tweet_id = tweet_id;
+            CURRENT_REFERENCE_TO_RETWEETERS_INFO.status = 'wait_dialog';
+            
+            if ( ( parse_individual_tweet_url() || {} ).tweet_id == tweet_id ) {
+                $ancestor.find( 'a[href$="retweets"]' ).get( 0 ).click();
+            }
+            else {
+                $ancestor.get( 0 ).click();
+            }
             
             return false;
         } );
@@ -1102,6 +1138,10 @@ function add_vicinity_link_to_tweet( $tweet ) {
         $link_container_bottom = $link_container.clone( true ),
         $link_bottom = $link_container_bottom.find( 'a:first' );
     
+    if ( ! timestamp_ms ) {
+        //$link_container.hide();
+    }
+    
     if ( is_individual_tweet ) {
         // 個別ツイートへの追加
         
@@ -1159,7 +1199,7 @@ function add_vicinity_link_to_tweet( $tweet ) {
                 act_screen_name : act_screen_name,
                 attributes : {
                     'data-event_element' : 'user_retweeted_on_timeline',
-                    'data-timestamp_ms' : timestamp_ms
+                    'data-timestamp_ms' : timestamp_ms,
                 }
             } );
             
@@ -1168,7 +1208,7 @@ function add_vicinity_link_to_tweet( $tweet ) {
             $link_container.addClass( 'middle' ).css( {
                 'position' : 'absolute',
                 'top' : '0',
-                'left' : '4px'
+                'left' : '4px',
             } );
             
             $link.css( {
@@ -1194,8 +1234,61 @@ function add_vicinity_link_to_tweet( $tweet ) {
 } // end of add_vicinity_link_to_tweet()
 
 
+function check_help_dialog() {
+    if ( ! /^\/i\/keyboard_shortcuts/.test( new URL( location.href ).pathname ) ) {
+        return false;
+    }
+    
+    var $modal_header_h2_list = $( '[aria-labelledby="modal-header"] h2[role="heading"][aria-level="2"]:not(#modal-header)' );
+    
+    if ( $modal_header_h2_list.length < 1 ) {
+        return false;
+    }
+    
+    var $shortcut_parent = $modal_header_h2_list.last().parents().eq( 1 );
+    
+    if ( 0 < $shortcut_parent.find( '.' + SCRIPT_NAME + '_key_help' ).length ) {
+        return false;
+    }
+    
+    var $shortcut_list = $shortcut_parent.children( 'div' );
+    
+    if ( $shortcut_list.length < 1 ) {
+        return false;
+    }
+    
+    var key_info_list = [
+            { label : OPTIONS.LINK_TITLE, key : OPTIONS.HELP_OPEN_LINK_KEYCHAR  },
+            { label : OPTIONS.ACT_LINK_TITLE, key : OPTIONS.HELP_OPEN_ACT_LINK_KEYCHAR },
+            { label : OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL, key : OPTIONS.HELP_OPEN_RERT_DIALOG_KEYCHAR }
+        ];
+    
+    key_info_list.forEach( function ( key_info ) {
+        var $shortcut_container = $shortcut_list.last().clone( true ),
+            $shortcut_label = $shortcut_container.children().first(),
+            $shortcut_content_container = $shortcut_container.children().last(),
+            $shortcut_key = $shortcut_content_container.children().first();
+        
+        $shortcut_container.addClass( SCRIPT_NAME + '_key_help' );
+        
+        $shortcut_content_container.empty();
+        $shortcut_content_container.append( $shortcut_key );
+        
+        $shortcut_label.empty();
+        $shortcut_key.empty();
+        
+        $shortcut_label.append( key_info.label );
+        $shortcut_key.append( key_info.key );
+        
+        $shortcut_parent.append( $shortcut_container );
+    } );
+} // end of check_help_dialog()
+
+
 function check_timeline_tweets() {
-    var $tweets = $( 'div[data-testid="primaryColumn"] article[role="article"]:has(div[data-testid="tweet"]):not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' );
+    // ツイートに近傍検索ボタン挿入
+    var $tweets = $( 'div[data-testid="primaryColumn"] article[role="article"]:has(div[data-testid="tweet"]):not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ),
+        tweet_url_info = parse_individual_tweet_url() || {};
     
     $tweets = $tweets.filter( function ( index ) {
         var $tweet = $( this );
@@ -1203,26 +1296,109 @@ function check_timeline_tweets() {
         return add_vicinity_link_to_tweet( $tweet );
     } );
     
-    var $recent_retweet_users_button_containers = $( 'div[data-testid="primaryColumn"] article[role="article"] .' + RECENT_RETWEETS_BUTTON_CLASS + ':hidden' );
+    if ( is_tweet_retweeters_url() ) {
+        // リツイートしたユーザー一覧に近傍検索ボタン挿入
+        update_tweet_retweeters_info( tweet_url_info.tweet_id, {
+            callback : () => {
+                if ( ! is_tweet_retweeters_url() ) {
+                    return;
+                }
+                
+                var reacted_tweet_info = get_reacted_tweet_info( tweet_url_info.tweet_id ),
+                    $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $();
+
+                log_debug( 'check_timeline_tweets():', $users.length, 'retweeters found', reacted_tweet_info );
+                
+                $users.each( function ( index ) {
+                    var $user = $( this ),
+                        $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="/profile_images/"]):first' ),
+                        act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' );
+                    
+                    if ( ! act_screen_name ) {
+                        return;
+                    }
+                    
+                    var rt_info = reacted_tweet_info.rt_info_map.screen_name_map[ act_screen_name ],
+                        $link_container,
+                        $link;
+                    
+                    if ( ! rt_info ) {
+                        return;
+                    }
+                    
+                    $link_container = create_vicinity_link_container( {
+                        tweet_url : location.href.replace( /\/retweets[\/]?[^\/]*$/, '' ),
+                        act_screen_name : act_screen_name,
+                        attributes : {
+                            'data-event_element' : 'user_retweeted_tweet',
+                            'data-timestamp_ms' : 1 * rt_info.timestamp_ms,
+                        }
+                    } );
+                    
+                    $link = $link_container.find( 'a:first' );
+                    
+                    $link_container.addClass( 'large' ).css( {
+                        'position' : 'absolute',
+                        'top' : '0',
+                        'right' : '140px',
+                        'z-index' : 100,
+                    } );
+                        
+                    $user.find( 'a[role="link"]:has(span>span):first' ).parent().after( $link_container );
+                } );
+            },
+            max_user_count : LIMIT_STATUSES_RETWEETS_USER_NUMBER,
+            cache_sec : 60, // DOMツリー更新の度に API がコールされるのを制限
+        } );
+    }
     
-    $recent_retweet_users_button_containers.each( function () {
-        var $recent_retweet_users_button_container = $( this ),
-            $recent_retweet_users_button = $recent_retweet_users_button_container.find( 'button:first' ),
-            tweet_url_info = parse_individual_tweet_url() || {},
-            $ancestor = $recent_retweet_users_button_container.parents( 'article[role="article"]:first' ),
-            retweet_number;
+    // リツイート数が表示されたときに[Re:RT]ボタンも表示
+    if ( OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON ) {
+        var $recent_retweet_users_button_containers = $( 'div[data-testid="primaryColumn"] article[role="article"] .' + RECENT_RETWEETS_BUTTON_CLASS + ':hidden' );
         
-        if ( tweet_url_info.tweet_id == $recent_retweet_users_button.attr( 'data-tweet-id' ) ) {
-            retweet_number = parseInt( $ancestor.find( 'a[href$="retweets"] span>span' ).text(), 10 );
-        }
-        else {
-            retweet_number = parseInt( $ancestor.find( 'div[data-testid="retweet"] span>span, div[data-testid="unretweet"] span>span' ).text() );
-        }
+        $recent_retweet_users_button_containers.each( function () {
+            var $recent_retweet_users_button_container = $( this ),
+                $recent_retweet_users_button = $recent_retweet_users_button_container.find( 'button:first' ),
+                $ancestor = $recent_retweet_users_button_container.parents( 'article[role="article"]:first' ),
+                retweet_number;
+            
+            if ( tweet_url_info.tweet_id == $recent_retweet_users_button.attr( 'data-tweet-id' ) ) {
+                retweet_number = parseInt( $ancestor.find( 'a[href$="retweets"] span>span' ).text(), 10 );
+                if ( ( tweet_url_info.tweet_id == CURRENT_REFERENCE_TO_RETWEETERS_INFO.tweet_id ) && ( CURRENT_REFERENCE_TO_RETWEETERS_INFO.status == 'wait_dialog' ) ) {
+                    $recent_retweet_users_button.click();
+                }
+            }
+            else {
+                retweet_number = parseInt( $ancestor.find( 'div[data-testid="retweet"] span>span, div[data-testid="unretweet"] span>span' ).text() );
+            }
+            
+            if ( ! isNaN( retweet_number ) ) {
+                $recent_retweet_users_button_container.show();
+            }
+        } );
+    }
+    // [Re:RT]押下後のダイアログ表示状態遷移判定
+    switch ( CURRENT_REFERENCE_TO_RETWEETERS_INFO.status ) {
+        case 'wait_dialog' :
+            if ( 0 <= location.href.indexOf( '/' + CURRENT_REFERENCE_TO_RETWEETERS_INFO.tweet_id + '/retweets' ) ) {
+                CURRENT_REFERENCE_TO_RETWEETERS_INFO.status = 'dialog_displayed';
+            }
+            break;
         
-        if ( ! isNaN( retweet_number ) ) {
-            //$recent_retweet_users_button_container.show();
-        }
-    } );
+        case 'dialog_displayed' :
+            if ( location.href.indexOf( '/' + CURRENT_REFERENCE_TO_RETWEETERS_INFO.tweet_id + '/retweets' ) < 0 ) {
+                CURRENT_REFERENCE_TO_RETWEETERS_INFO.status = 'idle';
+                
+                if ( location.href != CURRENT_REFERENCE_TO_RETWEETERS_INFO.url_to_return ) {
+                    //$( 'div[data-testid="primaryColumn"] div[role="button"][aria-label="Back"]:first' ).get( 0 ).click(); // TODO: ←によって戻ると、なぜか履歴がおかしくなる
+                    history.back();
+                    log_debug( 'history.back()' );
+                }
+            }
+            break;
+    }
+    
+    check_help_dialog();
     
     return ( 0 < $tweets.length );
 } // end of check_timeline_tweets()
@@ -1239,11 +1415,10 @@ var search_vicinity_tweet = ( () => {
         threshold_timestamp_ms = ( () => {
             var threshold_timestamp_ms = target_info.timestamp_ms;
             
-            if ( ! target_info.id ) {
+            if ( ( ! target_info.id ) && is_retweeted_event_element( SEARCH_PARAMETERS.event_element ) && ( SEARCH_PARAMETERS.use_user_timeline ) ) {
                 // TODO:リツイートやいいね等は、実際にアクションを起こしてから通知されるまで遅延がある
                 // →通知時刻の一定時間前までを許容（ただし、ツイート時間以降）
-                //threshold_timestamp_ms = Math.max( target_info.timestamp_ms - 60 * 1000, reacted_tweet_info.timestamp_ms );
-                // →保留
+                threshold_timestamp_ms = Math.max( target_info.timestamp_ms - 60 * 60 * 1000, reacted_tweet_info.timestamp_ms );
             }
             return threshold_timestamp_ms;
         } )( ),
@@ -1343,14 +1518,14 @@ var search_vicinity_tweet = ( () => {
                     }
                 }
                 else {
-                    if ( current_timestamp_ms <= threshold_timestamp_ms ) {
-                        is_itself = ( current_tweet_id == reacted_tweet_info.id );
+                    if ( current_tweet_id == reacted_tweet_info.id ) {
+                        is_itself = true;
                         $found_tweet = $tweet;
                         
                         return false;
                     }
                     
-                    if ( bignum_cmp( current_target_id, reacted_tweet_info.id ) < 0 ) {
+                    if ( ( bignum_cmp( current_target_id, reacted_tweet_info.id ) < 0 ) || ( current_timestamp_ms <= threshold_timestamp_ms ) ) {
                         is_itself = false;
                         $found_tweet = $tweet;
                         
@@ -1628,12 +1803,11 @@ function check_notification_timeline() {
                 
                 $link = $link_container.find( 'a:first' );
                 
-                $link_container.addClass( 'middle' ).css( {
-                    /*
-                    //'position' : 'absolute',
-                    //'top' : '12px',
-                    //'right' : '160px'
-                    */
+                $link_container.addClass( 'large' ).css( {
+                    'position' : 'absolute',
+                    'top' : '0',
+                    'right' : '140px',
+                    'z-index' : 100,
                 } );
                 
                 //$profile_image_link.after( $link_container );
@@ -1695,7 +1869,7 @@ function check_error_page() {
             tweet_url : tweet_url,
             class_name : [ 'large' ],
             attributes : {
-                'data-timestamp_ms' : timestamp_ms
+                'data-timestamp_ms' : timestamp_ms,
             }
         } ),
         $parent = $( 'div[data-testid="primaryColumn"] h1[role="heading"][data-testid="error-detail"]:first' );
@@ -1764,6 +1938,7 @@ var [
 //{ Twitter API 応答取得処理関連
 var [
     analyze_capture_result,
+    update_tweet_retweeters_info,
     get_reacted_tweet_info,
     get_reacted_tweet_info_map,
 ] = ( () => {
@@ -1773,6 +1948,7 @@ var [
         reg_user_timeline_url = /^\/2\/timeline\/(profile|media|favorites)\/(\d+)\.json/,
         reg_search_url = /^\/2\/search\/adaptive\.json/,
         reg_bookmark_timeline_url = /^\/2\/timeline\/bookmark.json/,
+        reg_retweeted_by_url = /^\/2\/timeline\/retweeted_by\.json/,
         reg_notification_all_url = /^\/2\/notifications\/all\.json/,
         reg_notification_view_url = /^\/2\/notifications\/view\/([^\/]+)\.json/,
         
@@ -1859,6 +2035,49 @@ var [
                 }
             }, // end of update_tweet_info()
             
+            update_retweeted_tweet_info = () => {
+                // ※リツイート時間が取得できない→保留
+                if ( ! reg_retweeted_by_url.test( new URL( url ).pathname ) ) {
+                    return;
+                }
+                
+                if ( ( ! users ) || ( ! timeline ) || ( ! ( timeline.id || '' ).match( /^Retweeters-(\d+)$/ ) ) ) {
+                    return;
+                }
+                
+                var tweet_id = RegExp.$1,
+                    reacted_tweet_info = get_reacted_tweet_info( tweet_id );
+                
+                if ( ! reacted_tweet_info ) {
+                    return;
+                }
+                
+                var reacted_info_map = reacted_tweet_info.rt_info_map,
+                    entries = get_add_entries();
+                
+                entries.forEach( ( entry ) => {
+                    if ( ( ! entry.entryId ) || ( ! entry.entryId.match( /^user-(.+)$/ ) ) ) {
+                        return;
+                    }
+                    
+                    var user_id = RegExp.$1,
+                        timestamp_ms = 1 * entry.sortIndex, // →これがリツイート時間だと思っていたが、単に現在時刻を元にしたソート用インデックスな模様
+                        user = users[ user_id ],
+                        screen_name = user.screen_name,
+                        existing_reacted_info = reacted_info_map.user_id_map[ user_id ],
+                        // 既存のものがある場合(個別ツイートのリツイート情報が既に得られている場合)、id(リツイートのステータスID) と timestamp_ms(リツイートの正確な時刻) は保持
+                        reacted_info = {
+                            id : ( existing_reacted_info ) ? existing_reacted_info.id : '',
+                            user_id : user_id,
+                            screen_name : screen_name,
+                            user_name : user.name,
+                            timestamp_ms : ( existing_reacted_info && ( existing_reacted_info.timestamp_ms < timestamp_ms ) ) ? existing_reacted_info.timestamp_ms : timestamp_ms,
+                        };
+                    
+                    reacted_info_map.user_id_map[ user_id ] = reacted_info_map.screen_name_map[ screen_name ] = reacted_info;
+                } );
+            }, // end of update_retweeted_tweet_info()
+            
             update_notification_info = () => {
                 if ( ! reg_notification_all_url.test( new URL( url ).pathname ) ) {
                     return;
@@ -1936,9 +2155,99 @@ var [
             }; // end of update_notification_info()
         
         update_tweet_info();
+        //update_retweeted_tweet_info();
         update_notification_info();
         
     } // end of analyze_capture_result();
+    
+    
+    var update_tweet_retweeters_info = ( () => {
+        var request_cache = {};
+        
+        return ( tweet_id, options ) => {
+            log_debug( 'update_tweet_retweeters_info() called', tweet_id, options );
+            
+            if ( ! options ) {
+                options = {};
+            }
+            
+            var max_user_count = DEFAULT_STATUSES_RETWEETS_USER_NUMBER,
+                callback;
+            
+            if ( options.max_user_count && ( 0 < options.max_user_count ) && ( options.max_user_count <= LIMIT_STATUSES_RETWEETS_USER_NUMBER ) ) {
+                max_user_count = options.max_user_count;
+            }
+            
+            if ( typeof options.callback == 'function' ) {
+                callback = options.callback;
+            }
+            else {
+                callback = function () {};
+            }
+            
+            var last_request_ms = request_cache[ tweet_id ],
+                current_ms = new Date().getTime(),
+                cache_sec = options.cache_sec ? options.cache_sec : OPTIONS.STATUSES_RETWEETS_CACHE_SEC;
+            
+            if ( ( last_request_ms ) && ( ( current_ms < last_request_ms + 1000 * cache_sec ) ) ) {
+                log_debug( 'update_tweet_retweeters_info() => cached', tweet_id  );
+                callback();
+                return;
+            }
+            
+            request_cache[ tweet_id ] = current_ms;
+            
+            var api_url = API_STATUSES_RETWEETS_TEMPLATE.replace( /#TWEET_ID#/g, tweet_id ).replace( /#COUNT#/g, max_user_count );
+            
+            fetch( api_url, {
+                method : 'GET',
+                headers : {
+                    'authorization' : 'Bearer ' + API_AUTHORIZATION_BEARER,
+                    'x-csrf-token' : api_get_csrf_token(),
+                    'x-twitter-active-user' : 'yes',
+                    'x-twitter-auth-type' : 'OAuth2Session',
+                    'x-twitter-client-language' : LANGUAGE,
+                },
+                mode: 'cors',
+                credentials: 'include',
+            } )
+            .then( response => response.json() )
+            .then( ( json ) => {
+                log_debug( 'update_tweet_retweeters_info(): json=', json );
+                
+                if ( ( ! Array.isArray( json ) ) || ( json.length <= 0 ) ) {
+                    callback();
+                    return;
+                }
+                
+                var reacted_tweet_info = get_reacted_tweet_info( tweet_id ),
+                    reacted_info_map = reacted_tweet_info.rt_info_map;
+                
+                json.forEach( ( retweet ) => {
+                    var user = retweet.user,
+                        user_id = user.id_str,
+                        screen_name = user.screen_name,
+                        existing_reacted_info = reacted_info_map.user_id_map[ user_id ],
+                        reacted_info = {
+                            id : retweet.id_str,
+                            user_id : user_id,
+                            screen_name : screen_name,
+                            user_name : user.name,
+                            timestamp_ms : Date.parse( retweet.created_at ),
+                        };
+                    reacted_info_map.user_id_map[ user_id ] = reacted_info_map.screen_name_map[ screen_name ] = reacted_info;
+                } );
+                
+                log_debug( 'update_tweet_retweeters_info(): ', json.length, 'users registerd' );
+                
+                callback();
+            } )
+            .catch( ( error ) => {
+                log_error( 'update_tweet_retweeters_info(): fetch error:', error );
+                callback();
+            } );
+        };
+    } )(); // end of update_tweet_retweeters_info()
     
     
     function get_reacted_tweet_info( tweet_id ) {
@@ -1952,6 +2261,7 @@ var [
     
     return [
         analyze_capture_result,
+        update_tweet_retweeters_info,
         get_reacted_tweet_info,
         get_reacted_tweet_info_map,
     ];
@@ -1982,9 +2292,42 @@ function analyze_fetch_data( message ) {
 } // end of analyze_fetch_data()
 
 
+function search_and_click_button_on_stream_item( event, button_selector ) {
+    var $region,
+        $target_element,
+        $button;
+    
+    if ( is_tweet_retweeters_url() ) {
+        $region = $( '[aria-labelledby="modal-header"] section[role="region"]' );
+        $target_element = $region.find( 'div[data-testid="UserCell"][data-focusvisible-polyfill="true"]' );
+        
+        if ( $target_element.length <= 0 ) {
+            $target_element = $region.find( 'div[data-testid="UserCell"]:has(a[data-self_tweet_id])' );
+        }
+    }
+    else {
+        $region = $( 'main[role="main"] [data-testid="primaryColumn"] section[role="region"]' );
+        $target_element = $region.find( 'article[role="article"][data-focusvisible-polyfill="true"]' );
+        
+        if ( $target_element.length <= 0 ) {
+            $target_element = $region.find( 'article[role="article"]:has(div[data-testid="tweet"])' );
+        }
+    }
+   
+    $button = $target_element.find( button_selector ).filter( ':visible' ).first();
+    
+    if ( 0 < $button.length ) {
+        $button.click();
+        
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
+    return false;
+} // end of search_and_click_button_on_stream_item()
+
+
 function start_key_observer() {
-    // TODO: ＠＠＠ 制作中 ＠＠＠
-/*
     function is_key_acceptable() {
         var $active_element = $( d.activeElement );
         
@@ -2000,13 +2343,8 @@ function start_key_observer() {
         return true;
     } // end of is_key_acceptable()
     
-    
     $( d.body )
     .on( 'keydown.main', function ( event ) {
-        if ( recent_retweet_users_dialog.is_opened() ) {
-            return;
-        }
-        
         if ( event.shiftKey || event.altKey || event.ctrlKey ) {
             return;
         }
@@ -2019,16 +2357,15 @@ function start_key_observer() {
         
         switch ( key_code ) {
             case OPTIONS.OPEN_LINK_KEYCODE :
-                return search_and_click_button_on_stream_item( event, 'div.' + LINK_CONTAINER_CLASS + ' a' );
+                return search_and_click_button_on_stream_item( event, 'div.' + SELF_CONTAINER_CLASS + ' a' );
             
             case OPTIONS.OPEN_ACT_LINK_KEYCODE :
                 return search_and_click_button_on_stream_item( event, 'div.' + ACT_CONTAINER_CLASS + ' a' );
             
             case OPTIONS.TOGGLE_RERT_DIALOG_KEYCODE :
-                return search_and_click_button_on_stream_item( event, '.' + SCRIPT_NAME + '-recent-retweets-button button' );
+                return search_and_click_button_on_stream_item( event, '.' + RECENT_RETWEETS_BUTTON_CLASS + ' button' );
         }
     } );
-*/
 } // end of start_key_observer()
 
 
@@ -2040,19 +2377,35 @@ function start_tweet_observer() {
             var result;
             
             performance.mark( 'm1' );
+            
+            // 表示モード更新
             update_display_mode();
+            
             performance.mark( 'm2' );
+            
+            // エラーページ確認
             result = check_error_page();
+            
             performance.mark( 'm3' );
+            
             if ( result ) {
                 return;
             }
             performance.mark( 'm4' );
+            
+            // タイムライン上で近傍ツイート検索
             search_vicinity_tweet();
+            
             performance.mark( 'm5' );
+            
+            // タイムライン上のツイート確認
             check_timeline_tweets();
+            
             performance.mark( 'm6' );
+            
+            // 通知タイムライン確認
             check_notification_timeline();
+            
             performance.mark( 'm7' );
         },
         
@@ -2585,6 +2938,8 @@ function set_user_css() {
                 'white-space: nowrap',
             ].join( '; ' ) + '}',
             
+            vicinity_link_container_selector + ' {display: inline-block;}',
+            
             vicinity_link_container_selector + '.icon a {' + [
                 'width: 12px; height: 12px',
                 'background-image: url(' + LINK_ICON_URL + ' )',
@@ -2646,14 +3001,11 @@ function initialize( user_options ) {
         return;
     }
     
-    ID_BEFORE = Decimal.mul( ID_INC_PER_SEC, OPTIONS.HOUR_BEFORE * 3600 );
     ID_AFTER = Decimal.mul( ID_INC_PER_SEC, OPTIONS.HOUR_AFTER * 3600 );
-    ID_BEFORE_LEGACY = Decimal.mul( ID_INC_PER_SEC_LEGACY, OPTIONS.HOUR_BEFORE * 3600 );
     ID_AFTER_LEGACY = Decimal.mul( ID_INC_PER_SEC_LEGACY, OPTIONS.HOUR_AFTER * 3600 );
     ID_THRESHOLD = new Decimal( ID_THRESHOLD );
     
     log_debug( 'ID_INC_PER_SEC =', ID_INC_PER_SEC.toString() );
-    log_debug( 'ID_BEFORE =', ID_BEFORE.toString() );
     log_debug( 'ID_AFTER =', ID_AFTER.toString() );
     log_debug( 'ID_THRESHOLD =', ID_THRESHOLD.toString() );
     
@@ -2661,9 +3013,9 @@ function initialize( user_options ) {
     
     external_script_injection_ready( ( injected_scripts ) => {
         start_fetch_observer();
+        start_tweet_observer();
+        start_key_observer();
     } );
-    start_tweet_observer();
-    start_key_observer();
     
     /*
     //setTimeout( () => {
