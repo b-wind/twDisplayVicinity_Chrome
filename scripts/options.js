@@ -15,7 +15,8 @@ $( function () {
         ,   { key : 'ENABLE_RECENT_RETWEET_USERS_BUTTON', val : true }
         ],
         INT_KV_LIST = [
-            { key : 'HOUR_AFTER', val : 8, min : 0, max : null }
+            //{ key : 'HOUR_AFTER', val : 8, min : 0, max : null }
+            { key : 'HOUR_AFTER', val : 3, min : 0, max : null }
         ,   { key : 'MAX_USER_NUMBER', val : 30, min : 1, max : 100 }
         ,   { key : 'MAX_AFTER_RETWEET_MINUTES', val : 10, min : 1, max : 60 }
         ,   { key : 'MAX_BEFORE_RETWEET_MINUTES', val : 10, min : 0, max : 60 }
@@ -177,8 +178,9 @@ $( function () {
     
     function set_operation_evt() {
         var jq_operation = $( 'input[name="OPERATION"]' ),
-            operation = get_bool( localStorage[ 'OPERATION' ] ),
-            operation = ( operation === null ) ? true : operation; // デフォルトは true (動作中)
+            operation = get_bool( localStorage[ 'OPERATION' ] );
+        
+        operation = ( operation === null ) ? true : operation; // デフォルトは true (動作中)
         
         function set_operation( next_operation ) {
             var button_text = ( next_operation ) ? ( chrome.i18n.getMessage( 'STOP' ) ) : ( chrome.i18n.getMessage( 'START' ) ),
@@ -194,7 +196,6 @@ $( function () {
         
         jq_operation.unbind( 'click' ).click( function( event ) {
             set_operation( ! operation );
-            reset_context_menu();
         } );
         
         set_operation( operation );

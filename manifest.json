@@ -2,7 +2,7 @@
     "manifest_version" : 2
 ,   "name" : "__MSG_ext_title__"
 ,   "short_name" : "__MSG_ext_short_name__"
-,   "version" : "0.2.6.1300"
+,   "version" : "0.3.0.0"
 ,   "description" : "__MSG_ext_description__"
 ,   "author" : "furyu"
 ,   "default_locale" : "en"
@@ -16,12 +16,12 @@
 ,   "content_scripts" : [
         {
             "matches" : [ "http://twitter.com/*", "https://twitter.com/*" ]
-        ,   "js" : [ "scripts/jquery.min.js", "scripts/decimal.min.js", "scripts/load_options.js" ]
+        ,   "js" : [ "scripts/jquery.min.js", "scripts/decimal.min.js", "scripts/load_options.js", "scripts/inject.js" ]
         ,   "run_at" : "document_start"
         }
     ,   {
             "matches" : [ "http://twitter.com/*", "https://twitter.com/*" ]
-        ,   "js" : [ "scripts/twDisplayVicinity/twDisplayVicinity.user.js" ]
+        ,   "js" : [ "scripts/main_react.js", "scripts/twDisplayVicinity/twDisplayVicinity.user.js" ]
         ,   "run_at" : "document_end"
         }
     ]
@@ -39,4 +39,8 @@
     ,   "default_popup" : "options.html"
     }
 ,   "permissions": [ "webRequest", "webRequestBlocking", "*://*.twitter.com/*" ]
+
+,   "web_accessible_resources" : [
+        "scripts/*.js"
+    ]
 }

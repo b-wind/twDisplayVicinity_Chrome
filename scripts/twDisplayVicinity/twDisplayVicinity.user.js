@@ -120,8 +120,13 @@ var SCRIPT_NAME = 'twDisplayVicinity',
 
 //{ check environment
 if ( d.querySelector( 'div#react-root' ) ) {
-    // TODO: Twitter 新UI(React版) には未対応
-    console.error( SCRIPT_NAME + ': Not compatible with React Twitter' );
+    if ( w.is_web_extension ) {
+        // 拡張機能では main_react.js が動作
+    }
+    else {
+        // TODO: ユーザースクリプトでは Twitter 新UI(React版) には未対応
+        console.error( SCRIPT_NAME + ': Not compatible with React Twitter' );
+    }
     return;
 }
 

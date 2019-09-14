@@ -113,11 +113,13 @@ var twDisplayVicinity_chrome_init = ( function() {
 
 
 if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'function' ) ) {
-    jQuery.ajaxSettings.xhr = function () {
-        try {
-            return new content.XMLHttpRequest();
-        } catch ( e ) {}
-    };
+    jQuery.ajaxSetup( {
+        xhr : function () {
+            try {
+                return new content.XMLHttpRequest();
+            } catch ( e ) {}
+        }
+    } );
 }
 
 w.is_web_extension = true;
