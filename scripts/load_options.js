@@ -122,8 +122,6 @@ if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'fu
     } );
 }
 
-w.is_web_extension = true;
-w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
 
 // content_scripts の情報を渡す
 chrome.runtime.sendMessage( {
@@ -132,18 +130,40 @@ chrome.runtime.sendMessage( {
         url : location.href,
     }
 }, function ( response ) {
-    window.addEventListener( 'beforeunload', function ( event ) {
-        // TODO: タブを閉じた際にはメッセージが届かない
-        chrome.runtime.sendMessage( {
-            type : 'NOTIFICATION_ONUNLOAD',
-            info : {
-                url : location.href,
-                event : 'onbeforeunload',
-            }
-        }, function ( response ) {
-        } );
-    } );
+    /*
+    //window.addEventListener( 'beforeunload', function ( event ) {
+    //    // TODO: メッセージが送信できないケース有り ("Uncaught TypeError: Cannot read property 'sendMessage' of undefined")
+    //    chrome.runtime.sendMessage( {
+    //        type : 'NOTIFICATION_ONUNLOAD',
+    //        info : {
+    //            url : location.href,
+    //            event : 'onbeforeunload',
+    //        }
+    //    }, function ( response ) {
+    //    } );
+    //} );
+    */
 } );
+
+
+chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
+    switch ( message.type )  {
+        case 'RELOAD_REQUEST' :
+            sendResponse( {
+                result : 'OK'
+            } );
+            
+            setTimeout( () => {
+                location.reload();
+            }, 100 );
+            break;
+    }
+    return true;
+} );
+
+
+w.is_web_extension = true;
+w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
 
 } )( window, document );
 

@@ -26,13 +26,25 @@ var reload_tabs = ( () => {
             log_debug( 'reload_tab():', tab_info );
             var tab_id = tab_info.tab_id;
             
-            log_debug( 'chrome.tabs.reload():', tab_info );
-            chrome.tabs.reload( tab_id, () => {
-                if ( chrome.runtime.lastError ) {
-                    // タブが存在しなければ chrome.runtime.lastError 発生→タブ情報を削除
+            /*
+            // TODO: 既に別のページに遷移していてもリロードをかけてしまう
+            //chrome.tabs.reload( tab_id, () => {
+            //    if ( chrome.runtime.lastError ) {
+            //        delete CONTENT_TAB_INFOS[ tab_id ];
+            //        log_debug( 'tab does not exist: tab_id=', tab_id, '=> removed:', tab_info, '=> remained:', CONTENT_TAB_INFOS );
+            //    }
+            //} );
+            */
+            chrome.tabs.sendMessage( tab_id, {
+                type : 'RELOAD_REQUEST',
+            }, {
+            }, ( response ) => {
+                log_debug( 'response', response );
+                if ( chrome.runtime.lastError || ( ! response ) ) {
+                    // タブが存在しないか、応答が無ければ chrome.runtime.lastError 発生→タブ情報を削除
                     // ※chrome.runtime.lastErrorをチェックしないときは Console に "Unchecked runtime.lastError: No tab with id: xxxx." 表示
                     delete CONTENT_TAB_INFOS[ tab_id ];
-                    log_debug( 'tab does not exist: tab_id=', tab_id, '=> removed:', tab_info, '=> remained:', CONTENT_TAB_INFOS );
+                    log_debug( 'tab or content_script does not exist: tab_id=', tab_id, '=> removed:', tab_info, '=> remained:', CONTENT_TAB_INFOS );
                 }
             } );
         };
