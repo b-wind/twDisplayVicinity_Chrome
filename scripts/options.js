@@ -5,7 +5,35 @@
 w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
 
 
-var IS_EDGE = ( 0 <= w.navigator.userAgent.toLowerCase().indexOf( 'edge' ) );
+var USER_AGENT = w.navigator.userAgent.toLowerCase(),
+    IS_EDGE = ( 0 <= USER_AGENT.indexOf( 'edge' ) ),
+    IS_FIREFOX = ( 0 <= USER_AGENT.indexOf( 'firefox' ) ),
+    IS_VIVALDI = ( 0 <= USER_AGENT.indexOf( 'vivaldi' ) ),
+    
+    value_updated = false,
+    background_window = chrome.extension.getBackgroundPage();
+
+background_window.log_debug( '***** options ******' );
+
+
+$( w ).on( ( IS_VIVALDI ) ? 'blur' : 'unload', function ( event ) {
+    // ※ Vivaldi 2.5.1525.48 では、popup を閉じても unload イベントは発生せず、次に popup を開いたときに発生してしまう
+    //    → 暫定的に blur イベントで対処
+    
+    background_window.log_debug( '< unloaded > value_updated:', value_updated );
+    
+    if ( ! value_updated ) {
+        return;
+    }
+    
+    value_updated = false;
+    
+    background_window.reload_tabs();
+    // オプションを変更した場合にタブをリロード
+    // ※TODO: 一度でも変更すると、値が同じであってもリロードされる
+    
+    background_window.log_debug( '< reload_tabs() done >' );
+} );
 
 
 $( function () {
@@ -102,6 +130,7 @@ $( function () {
             var jq_input = $( this );
             
             localStorage[ key ] = check_svalue( kv, jq_input.val() );
+            value_updated = true;
         } );
     } // end of set_radio_evt()
     
@@ -137,6 +166,7 @@ $( function () {
             var svalue = check_svalue( kv, jq_input.val() );
             
             localStorage[ key ] = svalue;
+            value_updated = true;
             jq_current.text( svalue );
             jq_input.val( svalue );
         } );
@@ -170,6 +200,7 @@ $( function () {
             var svalue = check_svalue( kv, jq_input.val() );
             
             localStorage[ key ] = svalue;
+            value_updated = true;
             jq_current.text( svalue );
             jq_input.val( svalue );
         } );
@@ -196,6 +227,7 @@ $( function () {
         
         jq_operation.unbind( 'click' ).click( function( event ) {
             set_operation( ! operation );
+            value_updated = true;
         } );
         
         set_operation( operation );
@@ -224,6 +256,8 @@ $( function () {
     
     $( 'input[name="DEFAULT"]' ).click( function () {
         localStorage.clear();
+        value_updated = true;
+        
         set_all_evt();
     } );
 

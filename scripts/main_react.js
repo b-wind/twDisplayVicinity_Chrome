@@ -176,6 +176,8 @@ var API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6
     TARGET_TWEET_CLASS = SCRIPT_NAME + '-target-tweet',
     VICINITY_TWEET_CLASS = SCRIPT_NAME + '-vicinity-tweet',
     
+    ACT_SEARCH_OFFSET_SEC = 60 * 60, // ユーザーアクション（リツイート／いいね）通知近傍検索の際に、通知時間から遡るオフセット値(秒)
+    
     WAIT_DOM_REFRESH_MS = 100, // 通信データ通知→DOM更新待ち時間(単位：ms)
     WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
     
@@ -1412,16 +1414,19 @@ var search_vicinity_tweet = ( () => {
     var marked_class = SCRIPT_NAME + '_marked',
         reacted_tweet_info = SEARCH_PARAMETERS.reacted_tweet_info,
         target_info = SEARCH_PARAMETERS.target_info,
+        is_user_timeline = SEARCH_PARAMETERS.use_user_timeline,
+        is_retweeted_event = is_retweeted_event_element( SEARCH_PARAMETERS.event_element ),
+        
         threshold_timestamp_ms = ( () => {
             var threshold_timestamp_ms = target_info.timestamp_ms;
             
-            if ( ( ! target_info.id ) && is_retweeted_event_element( SEARCH_PARAMETERS.event_element ) && ( SEARCH_PARAMETERS.use_user_timeline ) ) {
+            if ( ( ! target_info.id ) && is_retweeted_event && is_user_timeline ) {
                 // TODO:リツイートやいいね等は、実際にアクションを起こしてから通知されるまで遅延がある
-                // →通知時刻の一定時間前までを許容（ただし、ツイート時間以降）
-                threshold_timestamp_ms = Math.max( target_info.timestamp_ms - 60 * 60 * 1000, reacted_tweet_info.timestamp_ms );
+                // →リツイート通知かつユーザータイムライン上での検索であれば、対象ツイート（reacted_tweet_info.id）を含んでいる可能性が高いため、通知時刻の一定時間前までを許容（ただし、ツイート時間以降）
+                threshold_timestamp_ms = Math.max( target_info.timestamp_ms - ACT_SEARCH_OFFSET_SEC * 1000, reacted_tweet_info.timestamp_ms );
             }
             return threshold_timestamp_ms;
-        } )( ),
+        } )(),
         
         ua = w.navigator.userAgent.toLowerCase(),
         animate_target_selector = ( ( ( ! w.chrome ) && ua.indexOf( 'webkit' ) != -1 ) || ( ua.indexOf( 'opr' ) != -1 ) || ( ua.indexOf( 'edge' ) != -1 ) ) ? 'body,html' : 'html',
@@ -1525,7 +1530,14 @@ var search_vicinity_tweet = ( () => {
                         return false;
                     }
                     
-                    if ( ( bignum_cmp( current_target_id, reacted_tweet_info.id ) < 0 ) || ( current_timestamp_ms <= threshold_timestamp_ms ) ) {
+                    if ( current_timestamp_ms <= threshold_timestamp_ms ) {
+                        is_itself = false;
+                        $found_tweet = $tweet;
+                        
+                        return false;
+                    }
+                    
+                    if ( bignum_cmp( current_target_id, reacted_tweet_info.id ) < 0 ) {
                         is_itself = false;
                         $found_tweet = $tweet;
                         
@@ -2491,7 +2503,7 @@ function start_fetch_observer() {
                         data_container = document.createElement( 'input' );
                         data_container.id = data_dom_id;
                         data_container.type = 'hidden';
-                        data_container.value = JSON.stringify( data );
+                        //data_container.value = JSON.stringify( data );
                         data_container.setAttribute( 'date-api-url', data.url );
                         data_container.style.display = 'none';
                         fetch_wrapper_container.appendChild( data_container );
@@ -2513,7 +2525,7 @@ function start_fetch_observer() {
                             count : /[?&]count=(\d+)/,
                             cursor : /[?&]cursor=([^&]+)/,
                         },
-                        reg_location_url_max_id = /[?&]max_id=(\d+)/,
+                        reg_location_url_max_id = /[?&](?:max_id|max_position)=(\d*)/,
                         reg_number = /^(\d+)$/,
                         
                         url_filter_map = {
@@ -2555,7 +2567,9 @@ function start_fetch_observer() {
                                     return source_json;
                                 }
                                 
-                                var max_id = ( location.href.match( reg_location_url_max_id ) || [ 0, '9223372036854775806' ] )[ 1 ], // Tweet ID の最大値は 2^63-1 = 0x7fffffffffffffff = 9223372036854775807
+                                var max_id = ( location.href.match( reg_location_url_max_id ) || [ 0, 0 ] )[ 1 ] || '9153891586667446272',
+                                    // datetime_to_tweet_id(Date.parse( '2080-01-01T00:00:00.000Z' )) => 9153891586667446272
+                                    // 参考：Tweet ID の最大値は 2^63-1 = 0x7fffffffffffffff = 9223372036854775807 => tweet_id_to_date( '9223372036854775807' ).toISOString() => "2080-07-10T17:30:30.208Z"
                                     until_id = Decimal.add( max_id, 1 ).toString(),
                                     min_id_obj = new Decimal( max_id ),
                                     since_id,
@@ -2686,7 +2700,7 @@ function start_fetch_observer() {
                 filter_location_configs = [
                     {
                         name : 'usertimeline_for_searching',
-                        reg_location_url : /^https:\/\/twitter\.com\/([^\/]+)\/with_replies.*?[?&]max_id=(\d+)/,
+                        reg_location_url : /^https:\/\/twitter\.com\/([^\/]+)\/with_replies.*?[?&](?:max_id|max_position)=(\d*)/,
                         filter_url_configs : [
                             {
                                 name : 'use_api1.1_instead_of_2',

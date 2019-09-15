@@ -5,11 +5,66 @@
 w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
 
 
+var DEBUG = false,
+    CONTENT_TAB_INFOS = {};
+
+
+function log_debug() {
+    if ( ! DEBUG ) {
+        return;
+    }
+    console.log.apply( console, arguments );
+} // end of log_debug()
+
+w.log_debug = log_debug;
+
+
+var reload_tabs = ( () => {
+    var reg_host = /([^.]+\.)?twitter\.com/,
+        
+        reload_tab = ( tab_info ) => {
+            log_debug( 'reload_tab():', tab_info );
+            var tab_id = tab_info.tab_id;
+            
+            log_debug( 'chrome.tabs.reload():', tab_info );
+            chrome.tabs.reload( tab_id, () => {
+                if ( chrome.runtime.lastError ) {
+                    // タブが存在しなければ chrome.runtime.lastError 発生→タブ情報を削除
+                    // ※chrome.runtime.lastErrorをチェックしないときは Console に "Unchecked runtime.lastError: No tab with id: xxxx." 表示
+                    delete CONTENT_TAB_INFOS[ tab_id ];
+                    log_debug( 'tab does not exist: tab_id=', tab_id, '=> removed:', tab_info, '=> remained:', CONTENT_TAB_INFOS );
+                }
+            } );
+        };
+    
+    return () => {
+        log_debug( 'reload_tabs():', CONTENT_TAB_INFOS );
+        Object.values( CONTENT_TAB_INFOS ).forEach( ( tab_info ) => {
+            log_debug( tab_info );
+            
+            try {
+                if ( ! reg_host.test( new URL( tab_info.url ).host ) ) {
+                    return;
+                }
+            }
+            catch ( error ) {
+                return;
+            }
+            
+            reload_tab( tab_info );
+        } );
+    };
+} )();
+
+w.reload_tabs = reload_tabs;
+
+
 // メッセージ待ち受け
 // https://developer.chrome.com/extensions/runtime#event-onMessage
 chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
     var type = message.type,
-        response = null;
+        response = null,
+        tab_id = sender.tab && sender.tab.id;
     
     if ( ( sender.id != chrome.runtime.id ) || ( ! sender.tab ) || ( ! sender.tab.id ) ) {
         sendResponse( response );
@@ -30,6 +85,28 @@ chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse )
                     response[ name ] = localStorage[ ( ( namespace ) ? ( String( namespace ) + '_' ) : '' ) + name ];
                 } );
             } )( message.names, message.namespace );
+            break;
+        
+        case 'RELOAD_TABS':
+            reload_tabs();
+            break;
+        
+        case 'NOTIFICATION_ONLOAD' :
+            log_debug( 'NOTIFICATION_ONLOAD: tab_id', tab_id, message );
+            if ( tab_id ) {
+                CONTENT_TAB_INFOS[ tab_id ] = Object.assign( message.info, {
+                    tab_id : tab_id,
+                } );
+            }
+            log_debug( '=> CONTENT_TAB_INFOS', CONTENT_TAB_INFOS );
+            break;
+        
+        case 'NOTIFICATION_ONUNLOAD' :
+            log_debug( 'NOTIFICATION_ONUNLOAD: tab_id', tab_id, message );
+            if ( tab_id ) {
+                delete CONTENT_TAB_INFOS[ tab_id ];
+            }
+            log_debug( '=> CONTENT_TAB_INFOS', CONTENT_TAB_INFOS );
             break;
         
         default:

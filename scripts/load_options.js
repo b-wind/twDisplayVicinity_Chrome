@@ -125,6 +125,26 @@ if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'fu
 w.is_web_extension = true;
 w.twDisplayVicinity_chrome_init = twDisplayVicinity_chrome_init;
 
+// content_scripts の情報を渡す
+chrome.runtime.sendMessage( {
+    type : 'NOTIFICATION_ONLOAD',
+    info : {
+        url : location.href,
+    }
+}, function ( response ) {
+    window.addEventListener( 'beforeunload', function ( event ) {
+        // TODO: タブを閉じた際にはメッセージが届かない
+        chrome.runtime.sendMessage( {
+            type : 'NOTIFICATION_ONUNLOAD',
+            info : {
+                url : location.href,
+                event : 'onbeforeunload',
+            }
+        }, function ( response ) {
+        } );
+    } );
+} );
+
 } )( window, document );
 
 // ■ end of file
