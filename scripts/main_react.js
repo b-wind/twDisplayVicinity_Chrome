@@ -6,8 +6,9 @@
 
 w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
 
-// ■ Firefox で XMLHttpRequest や fetch が予期しない動作をすることへの対策
-// 参考:[Firefox のアドオン(content_scripts)でXMLHttpRequestやfetchを使う場合の注意 - 風柳メモ](https://memo.furyutei.work/entry/20180718/1531914142)
+
+// ■ Firefox で XMLHttpRequest や fetch が予期しない動作をしたり、開発者ツールのネットワークに通信内容が表示されないことへの対策
+// 参考: [Firefox のアドオン(content_scripts)でXMLHttpRequestやfetchを使う場合の注意 - 風柳メモ](https://memo.furyutei.work/entry/20180718/1531914142)
 const XMLHttpRequest = ( typeof content != 'undefined' && typeof content.XMLHttpRequest == 'function' ) ? content.XMLHttpRequest  : w.XMLHttpRequest;
 const fetch = ( typeof content != 'undefined' && typeof content.fetch == 'function' ) ? content.fetch  : w.fetch;
 
@@ -65,7 +66,8 @@ var OPTIONS = {
 var SCRIPT_NAME = 'twDisplayVicinity_React',
     SCRIPT_NAME_JA = '近傍ツイート検索',
     
-    DEBUG = false;
+    DEBUG = false,
+    DEBUG_PERFORMANCE = false;
 
 //{ 実行環境の確認
 
@@ -196,8 +198,8 @@ var API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6
     WAIT_BEFORE_GIVEUP_SCROLL_SEC = 30, // 強制スクロールさせてタイムラインの続きを読み込む際に、いつまでも変化が見られず、諦めるまでの時間(単位:秒)
     
     MAX_ADJUST_SCROLL_NUMBER = 30, // ツイート検索後の位置調整でチェックする最大数
-    ADJUST_CHECK_INTERVAL_MS = 200, // 同・チェック間隔(単位：ms)
-    ADJUST_ACCEPTABLE_NUMBER = 5, // 同・ツイートのスクロール位置が安定するまでの回数（連続してADJUST_ACCEPTABLE_NUMBER回一致すれば安定したとみなす）
+    ADJUST_CHECK_INTERVAL_MS = 500, // 同・チェック間隔(単位：ms)
+    ADJUST_ACCEPTABLE_NUMBER = 3, // 同・ツイートのスクロール位置が安定するまでの回数（連続してADJUST_ACCEPTABLE_NUMBER回一致すれば安定したとみなす）
     
     LIMIT_STATUSES_RETWEETS_USER_NUMBER = 100, // statuses/retweets のユーザー数制限
     DEFAULT_STATUSES_RETWEETS_USER_NUMBER = 30, // statuses/retweets のデフォルトユーザー数
@@ -1415,8 +1417,8 @@ function check_timeline_tweets() {
                 
                 if ( location.href != CURRENT_REFERENCE_TO_RETWEETERS_INFO.url_to_return ) {
                     //$( 'div[data-testid="primaryColumn"] div[role="button"][aria-label="Back"]:first' ).get( 0 ).click(); // TODO: ←によって戻ると、なぜか履歴がおかしくなる
-                    history.back();
                     log_debug( 'history.back()' );
+                    history.back();
                 }
             }
             break;
@@ -1458,93 +1460,182 @@ var search_vicinity_tweet = ( () => {
         //   'body' ← Safari, Opera, Edge
         animate_speed = 'fast', //  'slow', 'normal', 'fast' またはミリ秒単位の数値
         
-        search_status = 'initialize', // 'initialize', 'wait_ready', 'search', 'found', 'stop', 'error'
-        giveup_timerid = null,
+        search_status = 'initialize', // 'initialize', 'wait_ready', 'search', 'found', 'error'
         stop_scrolling_request = false,
         
         $primary_column = $(),
         $timeline = $(),
-        $stop_button_container = $(),
         $found_tweet_container = $(),
-        
         found_tweet_info = {},
         
-        $navigation_container = $(),
-        
-        create_navigation = () => {
-            var button_color = ( is_night_mode() ) ? 'pink' : 'red',
-                hover_class = 'r-zv2cs0',
-                $source_navigation = $( 'header[role="banner"] nav[role="navigation"]:first' ),
-                $source_navigation_container = $source_navigation.parent(),
-                $destination_button = $source_navigation.children( 'a[role="link"]' ).eq( 1 ).clone( true ),
-                $destination_navigation_container = $source_navigation_container.clone( true ),
-                $destination_navigation = $destination_navigation_container.children( 'nav' ).empty().attr( {
-                    'aria-label' : SCRIPT_NAME + '-menu',
-                } ),
-                $destination_close_icon = $destination_button.find( 'svg' ).html(
-                    '<g><path d="M13.414 12l5.793-5.793c.39-.39.39-1.023 0-1.414s-1.023-.39-1.414 0L12 10.586 6.207 4.793c-.39-.39-1.023-.39-1.414 0s-.39 1.023 0 1.414L10.586 12l-5.793 5.793c-.39.39-.39 1.023 0 1.414.195.195.45.293.707.293s.512-.098.707-.293L12 13.414l5.793 5.793c.195.195.45.293.707.293s.512-.098.707-.293c.39-.39.39-1.023 0-1.414L13.414 12z"></path></g>'
-                ).css( {
-                    color : button_color,
-                } );
+        [ 
+            hide_sidebar,
+            show_sidebar,
+        ] = ( () => {
+            var search_style_id = SCRIPT_NAME + '-search_style',
             
-            $destination_button.children( 'div' ).on( {
-                'mouseenter' : function ( event ) {
-                    $( this ).addClass( hover_class );
-                },
-                'mouseleave' : function ( event ) {
-                    $( this ).removeClass( hover_class );
-                },
-            } );
-            
-            $destination_button.find( 'span' )
-            .text( OPTIONS.STOP_SCROLLING_BUTTON_TEXT )
-            .css( {
-                color : button_color,
-            } );
-            
-            $destination_button.attr( {
-                'href' : location.href,
-                'data-testid' : SCRIPT_NAME + '-stop-scrolling-button',
-                'aria-label' : OPTIONS.STOP_SCROLLING_BUTTON_TEXT,
-            } ).on( 'click', function ( event ) {
-                event.stopPropagation();
-                event.preventDefault();
+                hide_sidebar = () => {
+                    $( '#' + search_style_id ).remove();
+                    
+                    insert_css( [
+                        'div[data-testid="sidebarColumn"] {display: none;}',
+                    ].join( '\n' ), search_style_id );
+                }, // end of hide_sidebar()
                 
-                $destination_navigation_container.remove();
+                show_sidebar = () => {
+                    $( '#' + search_style_id ).remove();
+                    /*
+                    //insert_css( [
+                    //    'div[data-testid="sidebarColumn"] {display: flex;}',
+                    //].join( '\n' ), search_style_id );
+                    */
+                }; // end of show_sidebar()
+            
+            return [
+                hide_sidebar,
+                show_sidebar,
+            ];
+        } )(),
+        
+        [
+            create_navigation,
+            remove_navigation,
+        ] = ( () => {
+            var $navigation_container = $(),
                 
-                stop_scrolling_request = true;
-                log_info( '[stop searching] canceled by user operation: search_status=', search_status );
-            } );
-            
-            $destination_navigation.append( $destination_button );
-            
-            $source_navigation_container.parent().append( $destination_navigation_container );
-            
-            $navigation_container.remove();
-            $navigation_container = $destination_navigation_container;
-            
-            return $navigation_container;
-        }, // create_navigation()
+                create_navigation = () => {
+                    var button_color = ( is_night_mode() ) ? 'pink' : 'red',
+                        hover_class = 'r-zv2cs0',
+                        $source_navigation = $( 'header[role="banner"] nav[role="navigation"]:first' ),
+                        $source_navigation_container = $source_navigation.parent(),
+                        $destination_button = $source_navigation.children( 'a[role="link"]' ).eq( 1 ).clone( true ),
+                        $destination_navigation_container = $source_navigation_container.clone( true ),
+                        $destination_navigation = $destination_navigation_container.children( 'nav' ).empty().attr( {
+                            'aria-label' : SCRIPT_NAME + '-menu',
+                        } ),
+                        $destination_close_icon = $destination_button.find( 'svg' ).html(
+                            '<g><path d="M13.414 12l5.793-5.793c.39-.39.39-1.023 0-1.414s-1.023-.39-1.414 0L12 10.586 6.207 4.793c-.39-.39-1.023-.39-1.414 0s-.39 1.023 0 1.414L10.586 12l-5.793 5.793c-.39.39-.39 1.023 0 1.414.195.195.45.293.707.293s.512-.098.707-.293L12 13.414l5.793 5.793c.195.195.45.293.707.293s.512-.098.707-.293c.39-.39.39-1.023 0-1.414L13.414 12z"></path></g>'
+                        ).css( {
+                            color : button_color,
+                        } );
+                    
+                    $navigation_container.remove();
+                    $navigation_container = $destination_navigation_container;
+                    
+                    $destination_button.children( 'div' ).on( {
+                        'mouseenter' : function ( event ) {
+                            $( this ).addClass( hover_class );
+                        },
+                        'mouseleave' : function ( event ) {
+                            $( this ).removeClass( hover_class );
+                        },
+                    } );
+                    
+                    $destination_button.find( 'span' )
+                    .text( OPTIONS.STOP_SCROLLING_BUTTON_TEXT )
+                    .css( {
+                        color : button_color,
+                    } );
+                    
+                    $destination_button.attr( {
+                        'href' : location.href,
+                        'data-testid' : SCRIPT_NAME + '-stop-scrolling-button',
+                        'aria-label' : OPTIONS.STOP_SCROLLING_BUTTON_TEXT,
+                    } ).on( 'click', function ( event ) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        
+                        remove_navigation();
+                        
+                        stop_scrolling_request = true;
+                        log_info( '[stop searching] canceled by user operation: search_status=', search_status );
+                    } );
+                    
+                    $destination_navigation.append( $destination_button );
+                    
+                    $source_navigation_container.parent().append( $navigation_container );
+                    
+                    return $navigation_container;
+                }, // create_navigation()
+                
+                remove_navigation = () => {
+                    log_debug( 'remove_navigation()' );
+                    
+                    show_sidebar();
+                    
+                    $navigation_container.remove();
+                }; // end of remove_navigation()
+                
+            return [
+                create_navigation,
+                remove_navigation,
+            ];
+        } )(),
         
-        remove_navigation = () => {
-            $navigation_container.remove();
-        }, // end of remove_navigation()
+        [ 
+            start_giveup_handler,
+            stop_giveup_handler,
+        ] = ( () => {
+            var giveup_timerid = null,
+                start_giveup_handler = () => {
+                giveup_timerid = ( ( previous_last_tweet_url ) => {
+                    return setInterval( () => {
+                        if ( stop_scrolling_request ) {
+                            stop_giveup_handler();
+                            return;
+                        }
+                        var current_last_tweet_url = $timeline.find( 'article[role="article"] a[role="link"]:has(time[datetime]):last' ).attr( 'href' );
+                        
+                        if ( ( ! is_search_mode() ) || ( current_last_tweet_url == previous_last_tweet_url ) ) {
+                            // 読み込まれたタイムラインの最後のツイートにいつまでも変化が無ければ諦める
+                            // TODO: 検索にかからなかった場合（「結果なし」「検索結果と一致するものはありません。」）の判定が困難（多国語対応のため）
+                            // → $timeline がいつまでも空のはずなので、タイムアウトでチェックする
+                            stop_giveup_handler();
+                            stop_cancel_handler();
+                            
+                            log_error( '[give up scrolling] search_status:', search_status, '=> error' );
+                            search_status = 'error';
+                            return;
+                        }
+                        previous_last_tweet_url = current_last_tweet_url;
+                    }, 1000 * WAIT_BEFORE_GIVEUP_SCROLL_SEC );
+                } )();
+                }, // end of start_giveup_handler()
+                
+                stop_giveup_handler = () => {
+                    log_debug( 'stop_giveup_handler()' );
+                    
+                    if ( giveup_timerid ) {
+                        clearInterval( giveup_timerid );
+                        giveup_timerid = null;
+                    }
+                }; // end of stop_giveup_handler()
+            
+            return [
+                start_giveup_handler,
+                stop_giveup_handler,
+            ];
+        } )(),
         
-        adjust_scroll = ( $target ) => {
-            var current_scroll_top = $( w ).scrollTop(),
-                //to_scroll_top = $target.offset().top - ( $( w ).height() - $target.height() ) / 2;
-                to_scroll_top = $target.offset().top - ( $( w ).height() / 2 );
+        [
+            start_cancel_handler,
+            stop_cancel_handler,
+        ] = ( () => {
+            var start_cancel_handler = () => {
+                    create_navigation();
+                }, // end of start_cancel_handler()
+                
+                stop_cancel_handler = () => {
+                    log_debug( 'stop_cancel_handler()' );
+                    
+                    remove_navigation();
+                }; // end of stop_cancel_handler()
             
-            if ( ( to_scroll_top <= 0 ) || ( Math.abs( to_scroll_top - current_scroll_top ) < 20 ) ) {
-                return true;
-            }
-            
-            $( animate_target_selector ).animate( {
-                scrollTop : to_scroll_top,
-            }, animate_speed );
-            
-            return false;
-        }, // end of adjust_scroll()
+            return [
+                start_cancel_handler,
+                stop_cancel_handler,
+            ];
+        } )(),
         
         search_tweet = () => {
             var is_itself = false,
@@ -1636,52 +1727,18 @@ var search_vicinity_tweet = ( () => {
                 if ( stop_scrolling_request ) {
                     return $();
                 }
+                
+                //$( w ).scrollTop( $( d ).height() );
                 $( animate_target_selector ).animate( {
-                    //scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(),
-                    scrollTop : $( d ).height(),
+                    //scrollTop : $( d ).height(),
+                    scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(),
                 }, animate_speed );
                 
                 return $();
             }
             
-            var $found_tweet_container = $found_tweet.parent().addClass( ( is_itself ) ? TARGET_TWEET_CLASS : VICINITY_TWEET_CLASS ),
+            var $found_tweet_container = $found_tweet.parent().addClass( ( is_itself ) ? TARGET_TWEET_CLASS : VICINITY_TWEET_CLASS );
                 // ※ article[role="article"] は頻繁に書き換わることがあるため、比較的安定な parent() に class を設定
-                
-                adjust_counter = MAX_ADJUST_SCROLL_NUMBER,
-                adjust_acceptable_number = ADJUST_ACCEPTABLE_NUMBER,
-                adjust_passed_number = 0,
-                
-                stop_adjust_handler = () => {
-                    if ( adjust_timerid ) {
-                        clearInterval( adjust_timerid );
-                        adjust_timerid = null;
-                    }
-                    stop_cancel_handler();
-                },
-                
-                adjust_timerid = setInterval( () => {
-                    // ※タイムラインが表示しきれておらず目的ツイートを真ん中にもってこれなかった場合等のために時間をずらして再度スクロール
-                    
-                    if ( stop_scrolling_request || ( search_status == 'stop' ) || ( search_status == 'error' ) ) {
-                        stop_adjust_handler();
-                        return;
-                    }
-                    
-                    adjust_counter --;
-                    
-                    if ( adjust_scroll( $found_tweet_container ) ) {
-                        adjust_passed_number ++;
-                    }
-                    else {
-                        adjust_passed_number = 0;
-                    }
-                    
-                    log_debug( 'adjust_passed_number:', adjust_passed_number );
-                    
-                    if ( ( adjust_acceptable_number <= adjust_passed_number ) || ( adjust_counter <= 0 ) ) {
-                        stop_adjust_handler();
-                    }
-                }, ADJUST_CHECK_INTERVAL_MS );
             
             found_tweet_info = {
                 is_itself : is_itself,
@@ -1689,12 +1746,88 @@ var search_vicinity_tweet = ( () => {
                 retweeter_screen_name : get_retweeter_screen_name( $found_tweet ),
             };
             
+            start_adjust_handler();
+            
             log_debug( '[target tweet was found] is_self:', is_itself, 'tweet:', $found_tweet, 'contaner:', $found_tweet_container );
             
             return $found_tweet_container;
         }, // end of search_tweet()
         
+        [
+            start_adjust_handler,
+            stop_adjust_handler,
+        ] = ( () => {
+            var adjust_timerid = null,
+                adjust_counter,
+                adjust_acceptable_number,
+                adjust_passed_number,
+                
+                adjust_scroll = ( $target ) => {
+                    var current_scroll_top = $( w ).scrollTop(),
+                        //to_scroll_top = $target.offset().top - ( $( w ).height() - $target.height() ) / 2;
+                        to_scroll_top = $target.offset().top - ( $( w ).height() / 2 );
+                    
+                    if ( ( to_scroll_top <= 0 ) || ( Math.abs( to_scroll_top - current_scroll_top ) < 20 ) ) {
+                        return true;
+                    }
+                    
+                    //$( w ).scrollTop( to_scroll_top );
+                    $( animate_target_selector ).animate( {
+                        scrollTop : to_scroll_top,
+                    }, animate_speed );
+                    
+                    return false;
+                }, // end of adjust_scroll()
+                
+                start_adjust_handler = () => {
+                    adjust_counter = MAX_ADJUST_SCROLL_NUMBER;
+                    adjust_acceptable_number = ADJUST_ACCEPTABLE_NUMBER;
+                    adjust_passed_number = 0;
+                    
+                    adjust_timerid = setInterval( () => {
+                        // ※タイムラインが表示しきれておらず目的ツイートを真ん中にもってこれなかった場合等のために時間をずらして再度スクロール
+                        
+                        if ( stop_scrolling_request || ( search_status == 'error' ) ) {
+                            stop_adjust_handler();
+                            return;
+                        }
+                        
+                        adjust_counter --;
+                        
+                        if ( adjust_scroll( $found_tweet_container ) ) {
+                            adjust_passed_number ++;
+                        }
+                        else {
+                            adjust_passed_number = 0;
+                        }
+                        
+                        log_debug( 'adjust_passed_number:', adjust_passed_number );
+                        
+                        if ( ( adjust_acceptable_number <= adjust_passed_number ) || ( adjust_counter <= 0 ) ) {
+                            stop_adjust_handler();
+                        }
+                    }, ADJUST_CHECK_INTERVAL_MS );
+                },
+                
+                stop_adjust_handler = () => {
+                    log_debug( 'stop_adjust_handler()' );
+                    
+                    if ( adjust_timerid ) {
+                        clearInterval( adjust_timerid );
+                        adjust_timerid = null;
+                    }
+                    stop_cancel_handler();
+                };
+            
+            return [
+                start_adjust_handler,
+                stop_adjust_handler,
+            ];
+        } )(),
+        
         update_found_tweet = () => {
+            // タイムライン上のツイートはスクロールに応じて挿入・削除が繰り返されるため、一度見つけたツイートも任意のタイミングで削除されうる
+            // →表示されている中で一致するツイートを見つけて、再度 class を設定することで対処
             if ( 0 < $found_tweet_container.parents( 'section[role="region"]:first' ).length ) {
                 return $found_tweet_container;
             }
@@ -1713,59 +1846,7 @@ var search_vicinity_tweet = ( () => {
             } );
             
             return $found_tweet_container;
-        }, // end of update_found_tweet()
-        
-        start_giveup_handler = () => {
-            giveup_timerid = ( ( previous_last_tweet_url ) => {
-                return setInterval( () => {
-                    if ( stop_scrolling_request ) {
-                        stop_giveup_handler();
-                        return;
-                    }
-                    var current_last_tweet_url = $timeline.find( 'article[role="article"] a[role="link"]:has(time[datetime]):last' ).attr( 'href' );
-                    
-                    if ( ( ! is_search_mode() ) || ( current_last_tweet_url == previous_last_tweet_url ) ) {
-                        // 読み込まれたタイムラインの最後のツイートにいつまでも変化が無ければ諦める
-                        // TODO: 検索にかからなかった場合（「結果なし」「検索結果と一致するものはありません。」）の判定が困難（多国語対応のため）
-                        // → $timeline がいつまでも空のはずなので、タイムアウトでチェックする
-                        stop_giveup_handler();
-                        
-                        log_error( '[give up scrolling] search_status:', search_status, '=> error' );
-                        search_status = 'error';
-                        return;
-                    }
-                    previous_last_tweet_url = current_last_tweet_url;
-                }, 1000 * WAIT_BEFORE_GIVEUP_SCROLL_SEC );
-            } )();
-        }, // end of start_giveup_handler()
-        
-        stop_giveup_handler = () => {
-            if ( giveup_timerid ) {
-                clearInterval( giveup_timerid );
-                giveup_timerid = null;
-            }
-        }, // end of stop_giveup_handler()
-        
-        start_cancel_handler = () => {
-            /*
-            //$( d.body ).off( 'click.search_tweet' ).on( 'click.search_tweet', function ( event ) {
-            //    event.stopPropagation();
-            //    event.preventDefault();
-            //    
-            //    stop_giveup_handler();
-            //    stop_cancel_handler();
-            //    
-            //    log_info( '[stop searching] canceled by user operation:', search_status, '=> stop' );
-            //    search_status = 'stop';
-            //} );
-            */
-            create_navigation();
-        }, // end of start_cancel_handler()
-        
-        stop_cancel_handler = () => {
-            //$( d.body ).off( 'click.search_tweet' );
-            remove_navigation();
-        }; // end of stop_cancel_handler()
+        }; // end of update_found_tweet()
     
     return () => {
         if ( ! is_search_mode() ) {
@@ -1776,10 +1857,9 @@ var search_vicinity_tweet = ( () => {
             case 'error' :
                 return;
             
-            case 'stop' :
-                return;
-            
             case 'initialize' :
+                hide_sidebar();
+                
                 $primary_column = $( 'div[data-testid="primaryColumn"]' );
                 if ( $primary_column.length <= 0 ) {
                     return;
@@ -2403,15 +2483,8 @@ var [
 //}
 
 
-function analyze_fetch_data( message ) {
-    var update_mark_id = SCRIPT_NAME + '-fetch-update-mark',
-        $update_mark = $( d.body ).find( '#' + update_mark_id ).remove();
-    
-    if ( $update_mark.length <= 0 ) {
-        $update_mark = $( '<input/>' ).attr( 'id', update_mark_id ).css( {
-            'display' : 'none',
-        } );
-    }
+function analyze_fetch_data( message, $analyze_update_mark ) {
+    var $fetch_wrapper_container;
     
     switch ( message.message_id ) {
         case 'FETCH_REQUEST_DATA' :
@@ -2433,7 +2506,11 @@ function analyze_fetch_data( message ) {
             break;
     }
     
-    $update_mark.attr( 'value', new Date().getTime() ).appendTo( $( d.body ) ); // analyze_*() により更新されたことを DOM 更新により MutationObserver に伝達
+    if ( $analyze_update_mark && ( 0 < $analyze_update_mark.length ) ) {
+        $fetch_wrapper_container = $analyze_update_mark.parent();
+        $analyze_update_mark.remove();
+        $analyze_update_mark.attr( 'value', new Date().getTime() ).appendTo( $fetch_wrapper_container ); // analyze_*() により更新されたことを DOM 更新により MutationObserver に伝達
+    }
     
 } // end of analyze_fetch_data()
 
@@ -2569,7 +2646,7 @@ function start_tweet_observer() {
     
     observer.observe( tweet_container, { childList : true, subtree : true } );
     
-    if ( OPTIONS.OBSERVE_DOM_FETCH_DATA ) {
+    if ( fetch_wrapper_container ) {
         fetch_observer.observe( fetch_wrapper_container, { childList : true, subtree : false } );
     }
 } // end of start_tweet_observer()
@@ -2582,7 +2659,17 @@ function start_fetch_observer() {
     // ※ chrome.webRequest.onCompleted では Response Headers は取得できても Body は取得できない
     // ※ chrome.devtools.network.onRequestFinished では、開発者ツールを開いていないと取得できない
     // → コンテンツに script を埋め込み、XMLHttpRequest / fetch にパッチをあてて取得
-    var make_fetch_wrapper = ( OBSERVE_DOM_FETCH_DATA ) => {
+    var fetch_wrapper_id = SCRIPT_NAME + '_fetch-wrapper-container',
+        analyze_update_mark_id = SCRIPT_NAME + '_analyze_update_mark_id',
+        
+        $fetch_wrapper_container = $( '<div/>' ).attr( 'id', fetch_wrapper_id ).appendTo( $( d.documentElement ) ).css( {
+            'display' : 'none',
+        } ),
+        $analyze_update_mark = $( '<input/>' ).attr( 'id', analyze_update_mark_id ).appendTo( $fetch_wrapper_container ).css( {
+            'type' : 'hidden',
+        } ),
+        
+        make_fetch_wrapper = ( OBSERVE_DOM_FETCH_DATA ) => {
             var container_dom_id = '##SCRIPT_NAME##_fetch-wrapper-container',
                 request_dom_id = '##SCRIPT_NAME##_fetch-wrapper-request',
                 result_dom_id = '##SCRIPT_NAME##_fetch-wrapper-result',
@@ -2603,10 +2690,7 @@ function start_fetch_observer() {
                 ],
                 
                 write_data = ( () => {
-                    var fetch_wrapper_container = document.createElement( 'div' );
-                    
-                    fetch_wrapper_container.id = container_dom_id;
-                    document.documentElement.appendChild( fetch_wrapper_container );
+                    var fetch_wrapper_container = document.querySelector( '#' + container_dom_id );
                     
                     return ( data, data_dom_id, reg_url_list ) => {
                         var url = data.url;
@@ -3030,7 +3114,7 @@ function start_fetch_observer() {
             return;
         }
         
-        analyze_fetch_data( message );
+        analyze_fetch_data( message, $analyze_update_mark );
     } );
     
     script.textContent = '(' + make_fetch_wrapper.toString().replace( /##SCRIPT_NAME##/g, SCRIPT_NAME ).replace( /##API_USER_TIMELINE_TEMPLATE##/g, API_USER_TIMELINE_TEMPLATE ) + ')(' + OPTIONS.OBSERVE_DOM_FETCH_DATA +');';
@@ -3045,13 +3129,16 @@ function start_fetch_observer() {
 } // end of start_fetch_observer()
 
 
-function insert_css( css_rule_text ) {
+function insert_css( css_rule_text, css_style_id ) {
     var parent = d.querySelector( 'head' ) || d.body || d.documentElement,
         css_style = d.createElement( 'style' ),
         css_rule = d.createTextNode( css_rule_text );
     
     css_style.type = 'text/css';
     css_style.className = SCRIPT_NAME + '-css-rule';
+    if ( css_style_id ) {
+        css_style.id = css_style_id;
+    }
     
     if ( css_style.styleSheet ) {
         css_style.styleSheet.cssText = css_rule.nodeValue;
@@ -3171,35 +3258,33 @@ function initialize( user_options ) {
     
     set_user_css();
     
-    external_script_injection_ready( ( injected_scripts ) => {
-        start_fetch_observer();
-        start_tweet_observer();
-        start_key_observer();
-    } );
+    start_fetch_observer();
+    start_tweet_observer();
+    start_key_observer();
     
-    /*
-    //setTimeout( () => {
-    //    var entries = [
-    //        { name : 'tweet-onchange', from : 'ma1', to : 'ma2' },
-    //        { name : 'fetch_tweet-onchange', from : 'mb1', to : 'mb2' },
-    //        
-    //        { name : 'update_display_mode()', from : 'm1', to : 'm2' },
-    //        { name : 'check_error_page()', from : 'm2', to : 'm3' },
-    //        { name : 'search_vicinity_tweet()', from : 'm4', to : 'm5' },
-    //        { name : 'check_timeline_tweets()', from : 'm5', to : 'm6' },
-    //        { name : 'check_notification_timeline()', from : 'm6', to : 'm7' },
-    //    ];
-    //    
-    //    entries.forEach( ( entry ) => {
-    //        try {
-    //            performance.measure( entry.name, entry.from, entry.to );
-    //            log_info( entry.name, performance.getEntriesByName( entry.name )[ 0 ].duration );
-    //        }
-    //        catch ( error ) {
-    //        }
-    //    } );
-    //}, 60*1000 );
-    */
+    if ( DEBUG_PERFORMANCE ) {
+        setTimeout( () => {
+            var entries = [
+                { name : 'tweet-onchange', from : 'ma1', to : 'ma2' },
+                { name : 'fetch_tweet-onchange', from : 'mb1', to : 'mb2' },
+                
+                { name : 'update_display_mode()', from : 'm1', to : 'm2' },
+                { name : 'check_error_page()', from : 'm2', to : 'm3' },
+                { name : 'search_vicinity_tweet()', from : 'm4', to : 'm5' },
+                { name : 'check_timeline_tweets()', from : 'm5', to : 'm6' },
+                { name : 'check_notification_timeline()', from : 'm6', to : 'm7' },
+            ];
+            
+            entries.forEach( ( entry ) => {
+                try {
+                    performance.measure( entry.name, entry.from, entry.to );
+                    log_info( entry.name, performance.getEntriesByName( entry.name )[ 0 ].duration );
+                }
+                catch ( error ) {
+                }
+            } );
+        }, 60*1000 );
+    }
     
     log_debug( 'All set.' );
 } // end of initialize()

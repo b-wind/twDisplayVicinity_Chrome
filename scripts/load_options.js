@@ -4,6 +4,32 @@
 
 w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
 
+if ( chrome.runtime.lastError ) {
+    console.log( '* chrome.runtime.lastError.message:', chrome.runtime.lastError.message );
+}
+
+
+// 外部スクリプトを content_scripts 内に挿入
+inject_script_all( [
+    'scripts/intercept_xhr.js',
+    'scripts/decimal.min.js',
+    'scripts/jquery.min.js',
+] );
+
+
+// Firefox(バージョン58以降)では、アドオンの content_scripts 内で XMLHttpRequest や fetch にページ（コンテンツ）上から実行されたのと同じ動作を期待するためには
+// window.XMLHttpRequest や window.fetch の代わりに content.XMLHttpRequest や content.fetch を使う必要あり
+// 参考：[Firefox のアドオン(content_scripts)でXMLHttpRequestやfetchを使う場合の注意 - 風柳メモ](https://memo.furyutei.work/entry/20180718/1531914142)
+if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'function' ) ) {
+    jQuery.ajaxSetup( {
+        xhr : function () {
+            try {
+                return new content.XMLHttpRequest();
+            } catch ( e ) {}
+        }
+    } );
+}
+
 
 function get_bool( value ) {
     if ( value === undefined ) {
@@ -69,12 +95,56 @@ function get_init_function( message_type, option_name_to_function_map, namespace
         ,   namespace :  ( namespace ) ? namespace : ''
         }, function ( response ) {
             var options = analyze_response( response );
-            callback( options );
+            
+            // 外部スクリプトの挿入完了を待つ
+            external_script_injection_ready( ( injected_scripts ) => {
+                callback( options );
+            } );
         } );
     }
     
     return init;
 } // end of get_init_function()
+
+
+// ■ content_scripts の情報を background に渡す
+chrome.runtime.sendMessage( {
+    type : 'NOTIFICATION_ONLOAD',
+    info : {
+        url : location.href,
+    }
+}, function ( response ) {
+    /*
+    //window.addEventListener( 'beforeunload', function ( event ) {
+    //    // TODO: メッセージが送信できないケース有り ("Uncaught TypeError: Cannot read property 'sendMessage' of undefined")
+    //    chrome.runtime.sendMessage( {
+    //        type : 'NOTIFICATION_ONUNLOAD',
+    //        info : {
+    //            url : location.href,
+    //            event : 'onbeforeunload',
+    //        }
+    //    }, function ( response ) {
+    //    } );
+    //} );
+    */
+} );
+
+
+// ■ background からのメッセージ受付
+chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
+    switch ( message.type )  {
+        case 'RELOAD_REQUEST' :
+            sendResponse( {
+                result : 'OK'
+            } );
+            
+            setTimeout( () => {
+                location.reload();
+            }, 100 );
+            break;
+    }
+    return true;
+} );
 
 
 var twDisplayVicinity_chrome_init = ( function() {
@@ -107,59 +177,9 @@ var twDisplayVicinity_chrome_init = ( function() {
         ,   ACT_LINK_TITLE : get_text
         ,   GO_TO_PAST_TEXT : get_text
         };
-    
+        
     return get_init_function( 'GET_OPTIONS', option_name_to_function_map );
 } )(); // end of twDisplayVicinity_chrome_init()
-
-
-if ( ( typeof content != 'undefined' ) && ( typeof content.XMLHttpRequest == 'function' ) ) {
-    jQuery.ajaxSetup( {
-        xhr : function () {
-            try {
-                return new content.XMLHttpRequest();
-            } catch ( e ) {}
-        }
-    } );
-}
-
-
-// content_scripts の情報を渡す
-chrome.runtime.sendMessage( {
-    type : 'NOTIFICATION_ONLOAD',
-    info : {
-        url : location.href,
-    }
-}, function ( response ) {
-    /*
-    //window.addEventListener( 'beforeunload', function ( event ) {
-    //    // TODO: メッセージが送信できないケース有り ("Uncaught TypeError: Cannot read property 'sendMessage' of undefined")
-    //    chrome.runtime.sendMessage( {
-    //        type : 'NOTIFICATION_ONUNLOAD',
-    //        info : {
-    //            url : location.href,
-    //            event : 'onbeforeunload',
-    //        }
-    //    }, function ( response ) {
-    //    } );
-    //} );
-    */
-} );
-
-
-chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse ) {
-    switch ( message.type )  {
-        case 'RELOAD_REQUEST' :
-            sendResponse( {
-                result : 'OK'
-            } );
-            
-            setTimeout( () => {
-                location.reload();
-            }, 100 );
-            break;
-    }
-    return true;
-} );
 
 
 w.is_web_extension = true;
