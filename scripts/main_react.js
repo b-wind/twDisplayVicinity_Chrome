@@ -6,6 +6,12 @@
 
 w.chrome = ( ( typeof browser != 'undefined' ) && browser.runtime ) ? browser : chrome;
 
+// ■ Firefox で XMLHttpRequest や fetch が予期しない動作をすることへの対策
+// 参考:[Firefox のアドオン(content_scripts)でXMLHttpRequestやfetchを使う場合の注意 - 風柳メモ](https://memo.furyutei.work/entry/20180718/1531914142)
+const XMLHttpRequest = ( typeof content != 'undefined' && typeof content.XMLHttpRequest == 'function' ) ? content.XMLHttpRequest  : w.XMLHttpRequest;
+const fetch = ( typeof content != 'undefined' && typeof content.fetch == 'function' ) ? content.fetch  : w.fetch;
+
+
 //{ ■ パラメータ
 var OPTIONS = {
     USE_SEARCH_TL_BY_DEFAULT : false, // true: デフォルトで検索タイムラインを使用
@@ -1312,69 +1318,63 @@ function check_timeline_tweets() {
         return add_vicinity_link_to_tweet( $tweet );
     } );
     
-    if ( is_tweet_retweeters_url() ) {
-        // リツイートしたユーザー一覧に近傍検索ボタン挿入
-        update_tweet_retweeters_info( tweet_url_info.tweet_id, {
-            callback : () => {
-                if ( ! is_tweet_retweeters_url() ) {
-                    return;
+    // リツイートしたユーザー一覧に近傍検索ボタン挿入
+    ( () => {
+        if ( ! is_tweet_retweeters_url() ) {
+            return;
+        }
+        
+        var reacted_tweet_info = get_reacted_tweet_info( tweet_url_info.tweet_id ),
+            $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
+            background_color = getComputedStyle( d.body ).backgroundColor;
+        
+        log_debug( 'check_timeline_tweets():', $users.length, 'retweeters found', reacted_tweet_info );
+        
+        $users.each( function ( index ) {
+            var $user = $( this ),
+                $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="profile_images/"]):first' ),
+                // 設定時例  : https://pbs.twimg.com/profile_images/<user-id>/<icon-image-name>
+                // 未設定時例: https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png
+                act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' );
+            
+            if ( ! act_screen_name ) {
+                return;
+            }
+            
+            var rt_info = reacted_tweet_info.rt_info_map.screen_name_map[ act_screen_name ],
+                $link_container,
+                $link;
+            
+            if ( ! rt_info ) {
+                return;
+            }
+            
+            $link_container = create_vicinity_link_container( {
+                tweet_url : location.href.replace( /\/retweets[\/]?[^\/]*$/, '' ),
+                act_screen_name : act_screen_name,
+                attributes : {
+                    'data-event_element' : 'user_retweeted_tweet',
+                    'data-timestamp_ms' : 1 * rt_info.timestamp_ms,
                 }
-                
-                var reacted_tweet_info = get_reacted_tweet_info( tweet_url_info.tweet_id ),
-                    $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
-                    background_color = getComputedStyle( d.body ).backgroundColor;
-                
-                log_debug( 'check_timeline_tweets():', $users.length, 'retweeters found', reacted_tweet_info );
-                
-                $users.each( function ( index ) {
-                    var $user = $( this ),
-                        $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="profile_images/"]):first' ),
-                        // 設定時例  : https://pbs.twimg.com/profile_images/<user-id>/<icon-image-name>
-                        // 未設定時例: https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png
-                        act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' );
-                    
-                    if ( ! act_screen_name ) {
-                        return;
-                    }
-                    
-                    var rt_info = reacted_tweet_info.rt_info_map.screen_name_map[ act_screen_name ],
-                        $link_container,
-                        $link;
-                    
-                    if ( ! rt_info ) {
-                        return;
-                    }
-                    
-                    $link_container = create_vicinity_link_container( {
-                        tweet_url : location.href.replace( /\/retweets[\/]?[^\/]*$/, '' ),
-                        act_screen_name : act_screen_name,
-                        attributes : {
-                            'data-event_element' : 'user_retweeted_tweet',
-                            'data-timestamp_ms' : 1 * rt_info.timestamp_ms,
-                        }
-                    } );
-                    
-                    $link = $link_container.find( 'a:first' ).css( {
-                        'padding' : '2px 4px',
-                        //'background-color' : is_night_mode() ? '#15202B' : '#FFFFFF',
-                        'background-color' : background_color,
-                        'border-radius' : '12px',
-                    } );
-                    
-                    $link_container.addClass( 'large' ).css( {
-                        'position' : 'absolute',
-                        'top' : '0',
-                        'right' : '140px',
-                        'z-index' : 100,
-                    } );
-                    
-                    $user.find( 'a[role="link"]:has(span>span):first' ).parent().after( $link_container );
-                } );
-            },
-            max_user_count : LIMIT_STATUSES_RETWEETS_USER_NUMBER,
-            cache_sec : 60, // DOMツリー更新の度に API がコールされるのを制限
+            } );
+            
+            $link = $link_container.find( 'a:first' ).css( {
+                'padding' : '2px 4px',
+                //'background-color' : is_night_mode() ? '#15202B' : '#FFFFFF',
+                'background-color' : background_color,
+                'border-radius' : '12px',
+            } );
+            
+            $link_container.addClass( 'large' ).css( {
+                'position' : 'absolute',
+                'top' : '0',
+                'right' : '140px',
+                'z-index' : 100,
+            } );
+            
+            $user.find( 'a[role="link"]:has(span>span):first' ).parent().after( $link_container );
         } );
-    }
+    } )();
     
     // リツイート数が表示されたときに[Re:RT]ボタンも表示
     if ( OPTIONS.ENABLE_RECENT_RETWEET_USERS_BUTTON ) {
@@ -2152,7 +2152,6 @@ var [
             }, // end of update_tweet_info()
             
             update_retweeted_tweet_info = () => {
-                // ※リツイート時間が取得できない→保留
                 if ( ! reg_retweeted_by_url.test( new URL( url ).pathname ) ) {
                     return;
                 }
@@ -2168,30 +2167,41 @@ var [
                     return;
                 }
                 
-                var reacted_info_map = reacted_tweet_info.rt_info_map,
-                    entries = get_add_entries();
-                
-                entries.forEach( ( entry ) => {
-                    if ( ( ! entry.entryId ) || ( ! entry.entryId.match( /^user-(.+)$/ ) ) ) {
-                        return;
-                    }
-                    
-                    var user_id = RegExp.$1,
-                        timestamp_ms = 1 * entry.sortIndex, // →これがリツイート時間だと思っていたが、単に現在時刻を元にしたソート用インデックスな模様
-                        user = users[ user_id ],
-                        screen_name = user.screen_name,
-                        existing_reacted_info = reacted_info_map.user_id_map[ user_id ],
-                        // 既存のものがある場合(個別ツイートのリツイート情報が既に得られている場合)、id(リツイートのステータスID) と timestamp_ms(リツイートの正確な時刻) は保持
-                        reacted_info = {
-                            id : ( existing_reacted_info ) ? existing_reacted_info.id : '',
-                            user_id : user_id,
-                            screen_name : screen_name,
-                            user_name : user.name,
-                            timestamp_ms : ( existing_reacted_info && ( existing_reacted_info.timestamp_ms < timestamp_ms ) ) ? existing_reacted_info.timestamp_ms : timestamp_ms,
-                        };
-                    
-                    reacted_info_map.user_id_map[ user_id ] = reacted_info_map.screen_name_map[ screen_name ] = reacted_info;
+                // ※ /2/timeline/retweeted_by だとリツイートIDや時間が取得できない→ /1.1/statuses/retweets で取得しなおす
+                /*
+                //var reacted_info_map = reacted_tweet_info.rt_info_map,
+                //    entries = get_add_entries();
+                //
+                //entries.forEach( ( entry ) => {
+                //    if ( ( ! entry.entryId ) || ( ! entry.entryId.match( /^user-(.+)$/ ) ) ) {
+                //        return;
+                //    }
+                //    
+                //    var user_id = RegExp.$1,
+                //        timestamp_ms = 1 * entry.sortIndex, // →これがリツイート時間だと思っていたが、単に現在時刻を元にしたソート用インデックスな模様
+                //        user = users[ user_id ],
+                //        screen_name = user.screen_name,
+                //        existing_reacted_info = reacted_info_map.user_id_map[ user_id ],
+                //        // 既存のものがある場合(個別ツイートのリツイート情報が既に得られている場合)、id(リツイートのステータスID) と timestamp_ms(リツイートの正確な時刻) は保持
+                //        reacted_info = {
+                //            id : ( existing_reacted_info ) ? existing_reacted_info.id : '',
+                //            user_id : user_id,
+                //            screen_name : screen_name,
+                //            user_name : user.name,
+                //            timestamp_ms : ( existing_reacted_info && ( existing_reacted_info.timestamp_ms < timestamp_ms ) ) ? existing_reacted_info.timestamp_ms : timestamp_ms,
+                //        };
+                //    
+                //    reacted_info_map.user_id_map[ user_id ] = reacted_info_map.screen_name_map[ screen_name ] = reacted_info;
+                //} );
+                */
+                update_tweet_retweeters_info( tweet_id, {
+                    callback : ( params ) => {
+                        log_debug( 'update_tweet_retweeters_info() callback(): params=', params );
+                    },
+                    max_user_count : LIMIT_STATUSES_RETWEETS_USER_NUMBER,
+                    cache_sec : 0, // キャッシュは使用しない
                 } );
+                
             }, // end of update_retweeted_tweet_info()
             
             update_notification_info = () => {
@@ -2271,7 +2281,7 @@ var [
             }; // end of update_notification_info()
         
         update_tweet_info();
-        //update_retweeted_tweet_info();
+        update_retweeted_tweet_info();
         update_notification_info();
         
     } // end of analyze_capture_result();
@@ -2307,7 +2317,9 @@ var [
             
             if ( ( last_request_ms ) && ( ( current_ms < last_request_ms + 1000 * cache_sec ) ) ) {
                 log_debug( 'update_tweet_retweeters_info() => cached', tweet_id  );
-                callback();
+                callback( {
+                    cached : true,
+                } );
                 return;
             }
             
@@ -2332,7 +2344,9 @@ var [
                 log_debug( 'update_tweet_retweeters_info(): json=', json );
                 
                 if ( ( ! Array.isArray( json ) ) || ( json.length <= 0 ) ) {
-                    callback();
+                    callback( {
+                        json : json,
+                    } );
                     return;
                 }
                 
@@ -2356,11 +2370,15 @@ var [
                 
                 log_debug( 'update_tweet_retweeters_info(): ', json.length, 'users registerd' );
                 
-                callback();
+                callback( {
+                    json : json,
+                } );
             } )
             .catch( ( error ) => {
                 log_error( 'update_tweet_retweeters_info(): fetch error:', error );
-                callback();
+                callback( {
+                    error : error,
+                } );
             } );
         };
     } )(); // end of update_tweet_retweeters_info()
@@ -2386,6 +2404,15 @@ var [
 
 
 function analyze_fetch_data( message ) {
+    var update_mark_id = SCRIPT_NAME + '-fetch-update-mark',
+        $update_mark = $( d.body ).find( '#' + update_mark_id ).remove();
+    
+    if ( $update_mark.length <= 0 ) {
+        $update_mark = $( '<input/>' ).attr( 'id', update_mark_id ).css( {
+            'display' : 'none',
+        } );
+    }
+    
     switch ( message.message_id ) {
         case 'FETCH_REQUEST_DATA' :
             try {
@@ -2405,6 +2432,9 @@ function analyze_fetch_data( message ) {
             }
             break;
     }
+    
+    $update_mark.attr( 'value', new Date().getTime() ).appendTo( $( d.body ) ); // analyze_*() により更新されたことを DOM 更新により MutationObserver に伝達
+    
 } // end of analyze_fetch_data()
 
 
