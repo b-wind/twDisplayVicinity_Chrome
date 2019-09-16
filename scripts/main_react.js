@@ -18,9 +18,15 @@ var OPTIONS = {
     VICINITY_TWEET_COLOR_NIGHTMODE : '#440044', // 近傍ツイートの色（夜間モード）
     
     USE_LINK_ICON : true, // 近傍リンクの種類（true: アイコンを使用 ／ false: 文字を使用(未対応)
+    
+    //TODO: 文字リンクは未対応（レイアウトが難しいため）
     //LINK_COLOR : 'inherit', // 近傍リンクの色('darkblue'→'inherit')
     //ACT_LINK_COLOR : 'inherit', // 通知リンクの色('indigo'→'inherit')
-    //※文字リンクは未対応（レイアウトが難しいため）
+    
+    LINK_ICON_COLOR : '#aab8c2',
+    LINK_ICON_COLOR_HOVER : '#ff9613',
+    LINK_ICON_COLOR_NIGHTMODE : '#aab8c2',
+    LINK_ICON_COLOR_HOVER_NIGHTMODE : '#ff9613',
     
     ENABLE_RECENT_RETWEET_USERS_BUTTON : true, // true: [Re:RT]（最近リツイートしたユーザーを表示するボタン）を有効に
     
@@ -131,6 +137,7 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = '全て開く';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = '全て↓';
         OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL = '[Re:RT]ダイアログを開く';
+        OPTIONS.STOP_SCROLLING_BUTTON_TEXT = 'スクロール停止';
         break;
     default:
         OPTIONS.LINK_TEXT = 'Vicinity';
@@ -157,6 +164,7 @@ switch ( LANGUAGE ) {
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TITLE = 'Open All';
         OPTIONS.REFERECE_TO_RETWEET_OPEN_ALL_BUTTON_TEXT = 'All ↓';
         OPTIONS.HELP_OPEN_RERT_DIALOG_LABEL = 'Open [Re:RT] dialog';
+        OPTIONS.STOP_SCROLLING_BUTTON_TEXT = 'Stop scrolling';
         break;
 }
 
@@ -216,16 +224,20 @@ var API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6
         url_to_return : null,
     },
     
-    LINK_ICON_URL = [ // アイコン(48×48)
-        'data:image/gif;base64,',
-        'R0lGODlhYAAwAKECAP+WE6q4wv///////yH5BAEKAAIALAAAAABgADAAQAL+lI+pi+HBopwKWEDz',
-        'fLx7p2nXSJZWiDZdyi7l9kEGd8Tg/NSxeRrjwesJfj4ejNZKFonKjM3WZASD0ariebNGpkKtxOMN',
-        'vcLOFZkyToLPkzQbhzWHuaY3/GNPTPPWGF9fxxeHdEbH5DWI52UYaLf2h+AGKfA4OURy5JcQd3dj',
-        'w1UBekkUBEVpxrn5RDV6scQaufclZykJWTlpS5aIG8WoW5WYxzjZ+wdsGWLMh8z2lAvrODhs+Mab',
-        'Q/brGnZNaKV92NddCP63TB1+Swudbr4O2Wz9fow52/18ivQJLjpWanoF35p9RlzI8sfD1EB8AXcU',
-        'RBgtVkJNC+8RhLiNn6gyCOfsxHM2j1m9ZB3ffDxTks3JJhZlaNGIAZHFORpR8jL5K08qdBGlpaS5',
-        'khu2ZK/eFAAAOw=='
-    ].join( '' ),
+    /*
+    //LINK_ICON_URL = [ // アイコン(48×48)
+    //    'data:image/gif;base64,',
+    //    'R0lGODlhYAAwAKECAP+WE6q4wv///////yH5BAEKAAIALAAAAABgADAAQAL+lI+pi+HBopwKWEDz',
+    //    'fLx7p2nXSJZWiDZdyi7l9kEGd8Tg/NSxeRrjwesJfj4ejNZKFonKjM3WZASD0ariebNGpkKtxOMN',
+    //    'vcLOFZkyToLPkzQbhzWHuaY3/GNPTPPWGF9fxxeHdEbH5DWI52UYaLf2h+AGKfA4OURy5JcQd3dj',
+    //    'w1UBekkUBEVpxrn5RDV6scQaufclZykJWTlpS5aIG8WoW5WYxzjZ+wdsGWLMh8z2lAvrODhs+Mab',
+    //    'Q/brGnZNaKV92NddCP63TB1+Swudbr4O2Wz9fow52/18ivQJLjpWanoF35p9RlzI8sfD1EB8AXcU',
+    //    'RBgtVkJNC+8RhLiNn6gyCOfsxHM2j1m9ZB3ffDxTks3JJhZlaNGIAZHFORpR8jL5K08qdBGlpaS5',
+    //    'khu2ZK/eFAAAOw=='
+    //].join( '' ),
+    */
+    
+    LINK_ICON_SVG = '<svg version="1.1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 -343.6)"><path transform="translate(0 343.6)" d="m0 10v4h3.8633a3.154 2.162 0 0 1 3.1367-1.9414 3.154 2.162 0 0 1 3.1348 1.9414h13.865v-4h-3.8594a3.154 2.162 0 0 1-3.1406 1.9766 3.154 2.162 0 0 1-3.1406-1.9766z" fill="currentColor"/><g transform="matrix(.48001 0 0 .42911 1.3839 211.29)" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><path d="m11.7 351.77h11l-11 11z"/><path d="m11.7 351.77h-11l11 11z"/></g><rect x="6.5596" y="357.32" width=".88075" height="6.3802" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.255" style="paint-order:stroke fill markers"/><g transform="matrix(.48001 0 0 -.42911 11.384 499.94)" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="3"><path d="m11.7 351.77h11l-11 11z"/><path d="m11.7 351.77h-11l11 11z"/></g><rect transform="scale(1,-1)" x="16.56" y="-353.92" width=".88075" height="6.3802" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.255" style="paint-order:stroke fill markers"/></g></svg>',
     
     SEARCH_PARAMETERS = ( function () {
         if ( ! w.opener ) {
@@ -914,7 +926,7 @@ var open_search_window = ( () => {
 
 var create_vicinity_link_container = ( function () {
     var $link_container_template = $( '<div><a></a></div>' ).addClass( VICINITY_LINK_CONTAINER_CLASS ),
-        $link_template = $link_container_template.find( 'a:first' ).addClass( VICINITY_LINK_CLASS );
+        $link_template = $link_container_template.find( 'a:first' ).addClass( VICINITY_LINK_CLASS ).html( LINK_ICON_SVG );
     
     return function ( options ) {
         options = ( options ) ? options : {};
@@ -930,9 +942,11 @@ var create_vicinity_link_container = ( function () {
             $link_container = $link_container_template.clone( true ),
             $link = $link_container.find( 'a:first' );
         
-        $link.attr( 'href', tweet_url );
-        $link.attr( 'data-self_tweet_id', tweet_url_info.tweet_id );
-        $link.attr( 'data-self_screen_name', tweet_url_info.screen_name );
+        $link.attr( {
+            'href' : tweet_url,
+            'data-self_tweet_id' : tweet_url_info.tweet_id,
+            'data-self_screen_name' : tweet_url_info.screen_name,
+        } );
         
         if ( act_screen_name ) {
             $link.attr( 'data-act_screen_name', act_screen_name );
@@ -963,7 +977,7 @@ var create_vicinity_link_container = ( function () {
         // TODO: 文字リンクの場合位置調整が難しい→アイコンリンク固定
         if ( true || OPTIONS.USE_LINK_ICON ) {
             $link_container.addClass( 'icon' );
-            $link.text( ' ' );
+            //$link.text( ' ' ); // → SVG に変更
         }
         else {
             $link_container.addClass( 'text' );
@@ -1307,13 +1321,16 @@ function check_timeline_tweets() {
                 }
                 
                 var reacted_tweet_info = get_reacted_tweet_info( tweet_url_info.tweet_id ),
-                    $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $();
-
+                    $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
+                    background_color = getComputedStyle( d.body ).backgroundColor;
+                
                 log_debug( 'check_timeline_tweets():', $users.length, 'retweeters found', reacted_tweet_info );
                 
                 $users.each( function ( index ) {
                     var $user = $( this ),
-                        $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="/profile_images/"]):first' ),
+                        $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="profile_images/"]):first' ),
+                        // 設定時例  : https://pbs.twimg.com/profile_images/<user-id>/<icon-image-name>
+                        // 未設定時例: https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png
                         act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' );
                     
                     if ( ! act_screen_name ) {
@@ -1337,7 +1354,12 @@ function check_timeline_tweets() {
                         }
                     } );
                     
-                    $link = $link_container.find( 'a:first' );
+                    $link = $link_container.find( 'a:first' ).css( {
+                        'padding' : '2px 4px',
+                        //'background-color' : is_night_mode() ? '#15202B' : '#FFFFFF',
+                        'background-color' : background_color,
+                        'border-radius' : '12px',
+                    } );
                     
                     $link_container.addClass( 'large' ).css( {
                         'position' : 'absolute',
@@ -1345,7 +1367,7 @@ function check_timeline_tweets() {
                         'right' : '140px',
                         'z-index' : 100,
                     } );
-                        
+                    
                     $user.find( 'a[role="link"]:has(span>span):first' ).parent().after( $link_container );
                 } );
             },
@@ -1438,12 +1460,75 @@ var search_vicinity_tweet = ( () => {
         
         search_status = 'initialize', // 'initialize', 'wait_ready', 'search', 'found', 'stop', 'error'
         giveup_timerid = null,
+        stop_scrolling_request = false,
         
         $primary_column = $(),
         $timeline = $(),
+        $stop_button_container = $(),
         $found_tweet_container = $(),
         
         found_tweet_info = {},
+        
+        $navigation_container = $(),
+        
+        create_navigation = () => {
+            var button_color = ( is_night_mode() ) ? 'pink' : 'red',
+                hover_class = 'r-zv2cs0',
+                $source_navigation = $( 'header[role="banner"] nav[role="navigation"]:first' ),
+                $source_navigation_container = $source_navigation.parent(),
+                $destination_button = $source_navigation.children( 'a[role="link"]' ).eq( 1 ).clone( true ),
+                $destination_navigation_container = $source_navigation_container.clone( true ),
+                $destination_navigation = $destination_navigation_container.children( 'nav' ).empty().attr( {
+                    'aria-label' : SCRIPT_NAME + '-menu',
+                } ),
+                $destination_close_icon = $destination_button.find( 'svg' ).html(
+                    '<g><path d="M13.414 12l5.793-5.793c.39-.39.39-1.023 0-1.414s-1.023-.39-1.414 0L12 10.586 6.207 4.793c-.39-.39-1.023-.39-1.414 0s-.39 1.023 0 1.414L10.586 12l-5.793 5.793c-.39.39-.39 1.023 0 1.414.195.195.45.293.707.293s.512-.098.707-.293L12 13.414l5.793 5.793c.195.195.45.293.707.293s.512-.098.707-.293c.39-.39.39-1.023 0-1.414L13.414 12z"></path></g>'
+                ).css( {
+                    color : button_color,
+                } );
+            
+            $destination_button.children( 'div' ).on( {
+                'mouseenter' : function ( event ) {
+                    $( this ).addClass( hover_class );
+                },
+                'mouseleave' : function ( event ) {
+                    $( this ).removeClass( hover_class );
+                },
+            } );
+            
+            $destination_button.find( 'span' )
+            .text( OPTIONS.STOP_SCROLLING_BUTTON_TEXT )
+            .css( {
+                color : button_color,
+            } );
+            
+            $destination_button.attr( {
+                'href' : location.href,
+                'data-testid' : SCRIPT_NAME + '-stop-scrolling-button',
+                'aria-label' : OPTIONS.STOP_SCROLLING_BUTTON_TEXT,
+            } ).on( 'click', function ( event ) {
+                event.stopPropagation();
+                event.preventDefault();
+                
+                $destination_navigation_container.remove();
+                
+                stop_scrolling_request = true;
+                log_info( '[stop searching] canceled by user operation: search_status=', search_status );
+            } );
+            
+            $destination_navigation.append( $destination_button );
+            
+            $source_navigation_container.parent().append( $destination_navigation_container );
+            
+            $navigation_container.remove();
+            $navigation_container = $destination_navigation_container;
+            
+            return $navigation_container;
+        }, // create_navigation()
+        
+        remove_navigation = () => {
+            $navigation_container.remove();
+        }, // end of remove_navigation()
         
         adjust_scroll = ( $target ) => {
             var current_scroll_top = $( w ).scrollTop(),
@@ -1548,6 +1633,9 @@ var search_vicinity_tweet = ( () => {
             
             if ( $found_tweet.length <= 0 ) {
                 // 見つからなかった場合、強制スクロール
+                if ( stop_scrolling_request ) {
+                    return $();
+                }
                 $( animate_target_selector ).animate( {
                     //scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(),
                     scrollTop : $( d ).height(),
@@ -1574,7 +1662,7 @@ var search_vicinity_tweet = ( () => {
                 adjust_timerid = setInterval( () => {
                     // ※タイムラインが表示しきれておらず目的ツイートを真ん中にもってこれなかった場合等のために時間をずらして再度スクロール
                     
-                    if ( ( search_status == 'stop' ) || ( search_status == 'error' ) ) {
+                    if ( stop_scrolling_request || ( search_status == 'stop' ) || ( search_status == 'error' ) ) {
                         stop_adjust_handler();
                         return;
                     }
@@ -1630,6 +1718,10 @@ var search_vicinity_tweet = ( () => {
         start_giveup_handler = () => {
             giveup_timerid = ( ( previous_last_tweet_url ) => {
                 return setInterval( () => {
+                    if ( stop_scrolling_request ) {
+                        stop_giveup_handler();
+                        return;
+                    }
                     var current_last_tweet_url = $timeline.find( 'article[role="article"] a[role="link"]:has(time[datetime]):last' ).attr( 'href' );
                     
                     if ( ( ! is_search_mode() ) || ( current_last_tweet_url == previous_last_tweet_url ) ) {
@@ -1655,20 +1747,24 @@ var search_vicinity_tweet = ( () => {
         }, // end of stop_giveup_handler()
         
         start_cancel_handler = () => {
-            $( d.body ).off( 'click.search_tweet' ).on( 'click.search_tweet', function ( event ) {
-                event.stopPropagation();
-                event.preventDefault();
-                
-                stop_giveup_handler();
-                stop_cancel_handler();
-                
-                log_info( '[stop searching] canceled by user operation:', search_status, '=> stop' );
-                search_status = 'stop';
-            } );
+            /*
+            //$( d.body ).off( 'click.search_tweet' ).on( 'click.search_tweet', function ( event ) {
+            //    event.stopPropagation();
+            //    event.preventDefault();
+            //    
+            //    stop_giveup_handler();
+            //    stop_cancel_handler();
+            //    
+            //    log_info( '[stop searching] canceled by user operation:', search_status, '=> stop' );
+            //    search_status = 'stop';
+            //} );
+            */
+            create_navigation();
         }, // end of start_cancel_handler()
         
         stop_cancel_handler = () => {
-            $( d.body ).off( 'click.search_tweet' );
+            //$( d.body ).off( 'click.search_tweet' );
+            remove_navigation();
         }; // end of stop_cancel_handler()
     
     return () => {
@@ -1743,8 +1839,11 @@ function check_notification_timeline() {
     
     $users.each( function () {
         var $user = $( this ),
-            $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="/profile_images/"]):first' ),
-            act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' );
+            $profile_image_link = $user.find( 'a[role="link"]:has(img[src*="profile_images/"]):first' ),
+            // 設定時例  : https://pbs.twimg.com/profile_images/<user-id>/<icon-image-name>
+            // 未設定時例: https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png
+            act_screen_name = ( $profile_image_link.attr( 'href' ) || '' ).replace( /^\//, '' ),
+            background_color = getComputedStyle( d.body ).backgroundColor;
         
         if ( ! act_screen_name ) {
             return;
@@ -1813,7 +1912,12 @@ function check_notification_timeline() {
                     act_screen_name : act_screen_name,
                 } );
                 
-                $link = $link_container.find( 'a:first' );
+                $link = $link_container.find( 'a:first' ).css( {
+                    'padding' : '2px 4px',
+                    //'background-color' : is_night_mode() ? '#15202B' : '#FFFFFF',
+                    'background-color' : background_color,
+                    'border-radius' : '12px',
+                } );
                 
                 $link_container.addClass( 'large' ).css( {
                     'position' : 'absolute',
@@ -2945,38 +3049,50 @@ function set_user_css() {
         css_rule_lines = [
             vicinity_link_selector + ' {' + [
                 'display: inline-block',
+                'width: 12px;',
+                'height: 12px;',
                 'margin: 0 0 0 8px',
                 'padding: 0 0 0 0',
                 'text-decoration: none',
                 'font-size: 12px',
                 'white-space: nowrap',
-            ].join( '; ' ) + '}',
+            ].join( '; ' ) + ';}',
             
             vicinity_link_container_selector + ' {display: inline-block;}',
             
             vicinity_link_container_selector + '.icon a {' + [
-                'width: 12px; height: 12px',
-                'background-image: url(' + LINK_ICON_URL + ' )',
-                'background-repeat: no-repeat',
-                'background-position: 0 0',
-                'background-size: 24px 12px',
-            ].join( '; ' ) + '}',
+                //'background-image: url(' + LINK_ICON_URL + ' )',
+                //'background-repeat: no-repeat',
+                //'background-position: 0 0',
+                //'background-size: 24px 12px',
+                'color : ' + OPTIONS.LINK_ICON_COLOR,
+            ].join( '; ' ) + ';}',
             
-            vicinity_link_container_selector + '.icon:hover a {' + [
-                'background-position : -12px 0',
-            ].join( '; ' ) + '}',
+            vicinity_link_container_selector + '.icon a:hover {' + [
+                //'background-position : -12px 0',
+                'color : ' + OPTIONS.LINK_ICON_COLOR_HOVER,
+            ].join( '; ' ) + ';}',
             
-            vicinity_link_container_selector + '.text a {opacity: 0.8;}',
-            vicinity_link_container_selector + '.text a:hover {opacity: 1.0;}',
-            vicinity_link_container_selector + '.text a {padding: 2px 4px; opacity: 0.8; color: #004262; background-color: #ffffee;}',
-            night_mode_selector + ' ' + vicinity_link_container_selector + '.text a {color: #ffffee; background-color: #004262;}',
+            night_mode_selector + ' ' + vicinity_link_container_selector + '.icon a {color: ' + OPTIONS.LINK_ICON_COLOR_NIGHTMODE + ';}',
+            night_mode_selector + ' ' + vicinity_link_container_selector + '.icon a:hover {color: ' + OPTIONS.LINK_ICON_COLOR_HOVER_NIGHTMODE + ';}',
+            
+            vicinity_link_container_selector + '.icon a svg {width: 100%; height: auto;}',
+            
+            /*
+            //vicinity_link_container_selector + '.text a {opacity: 0.8;}',
+            //vicinity_link_container_selector + '.text a:hover {opacity: 1.0;}',
+            //vicinity_link_container_selector + '.text a {padding: 2px 4px; opacity: 0.8; color: #004262; background-color: #ffffee;}',
+            //night_mode_selector + ' ' + vicinity_link_container_selector + '.text a {color: #ffffee; background-color: #004262;}',
+            */
             
             vicinity_link_container_selector + '.middle a {}',
-            vicinity_link_container_selector + '.middle.icon a {transform: scale(1.5, 1.5);}',
+            //vicinity_link_container_selector + '.middle.icon a {transform: scale(1.5, 1.5);}',
+            vicinity_link_container_selector + '.middle.icon a {width: 18px; height: 18px;}',
             vicinity_link_container_selector + '.middle.text a {}',
             
-            vicinity_link_container_selector + '.large a {transform: scale(2, 2);}',
-            vicinity_link_container_selector + '.large.icon a {}',
+            vicinity_link_container_selector + '.large a {}',
+            //vicinity_link_container_selector + '.large.icon a {transform: scale(2, 2);}',
+            vicinity_link_container_selector + '.large.icon a {width: 24px; height: 24px;}',
             vicinity_link_container_selector + '.larget.text a {}',
             
             recent_retweets_button_selector + ' {font-size: 12px; font-weight: normal; padding: 2px 3px; text-decoration: none; cursor: pointer; display: inline-block;}',
