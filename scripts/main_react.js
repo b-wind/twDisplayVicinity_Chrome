@@ -1287,7 +1287,7 @@ function add_vicinity_link_to_tweet( $tweet ) {
             $link_container.addClass( 'middle' ).css( {
                 'position' : 'absolute',
                 'top' : '0',
-                'left' : '4px',
+                'left' : '-4px',
             } );
             
             $link.css( {
@@ -1558,6 +1558,7 @@ var search_vicinity_tweet = ( () => {
             remove_navigation,
         ] = ( () => {
             var $navigation_container = $(),
+                x_mark_svg_inner = '<g><path d="M13.414 12l5.793-5.793c.39-.39.39-1.023 0-1.414s-1.023-.39-1.414 0L12 10.586 6.207 4.793c-.39-.39-1.023-.39-1.414 0s-.39 1.023 0 1.414L10.586 12l-5.793 5.793c-.39.39-.39 1.023 0 1.414.195.195.45.293.707.293s.512-.098.707-.293L12 13.414l5.793 5.793c.195.195.45.293.707.293s.512-.098.707-.293c.39-.39.39-1.023 0-1.414L13.414 12z"></path></g>', // ×印
                 
                 create_navigation = () => {
                     var button_color = ( is_night_mode() ) ? 'pink' : 'red',
@@ -1569,9 +1570,7 @@ var search_vicinity_tweet = ( () => {
                         $destination_navigation = $destination_navigation_container.children( 'nav' ).empty().attr( {
                             'aria-label' : SCRIPT_NAME + '-menu',
                         } ),
-                        $destination_close_icon = $destination_button.find( 'svg' ).html(
-                            '<g><path d="M13.414 12l5.793-5.793c.39-.39.39-1.023 0-1.414s-1.023-.39-1.414 0L12 10.586 6.207 4.793c-.39-.39-1.023-.39-1.414 0s-.39 1.023 0 1.414L10.586 12l-5.793 5.793c-.39.39-.39 1.023 0 1.414.195.195.45.293.707.293s.512-.098.707-.293L12 13.414l5.793 5.793c.195.195.45.293.707.293s.512-.098.707-.293c.39-.39.39-1.023 0-1.414L13.414 12z"></path></g>'
-                        ).css( {
+                        $destination_close_icon = $destination_button.find( 'svg' ).html( x_mark_svg_inner ).css( {
                             color : button_color,
                         } );
                     
@@ -1714,10 +1713,12 @@ var search_vicinity_tweet = ( () => {
                 
                 // TODO: fetch データ取得のタイミングによっては get_reacted_tweet_info() でツイート情報が取得できない場合あり
                 // →遅延させて再検索（このケースでは DOM 更新が走るとは限らないので setTimeout() で起動）
-                setTimeout( () => {
-                    search_vicinity_tweet();
-                }, WAIT_DOM_REFRESH_MS );
-                
+                // → analyze_fetch_data() で DOM 要素を挿入するようにしたので改善を期待
+                /*
+                //setTimeout( () => {
+                //    search_vicinity_tweet();
+                //}, WAIT_DOM_REFRESH_MS );
+                */
                 return $();
             }
             
@@ -1727,6 +1728,10 @@ var search_vicinity_tweet = ( () => {
                     $tweet_container = $tweet.parent().addClass( marked_class ),
                     // ※ article[role="article"] は頻繁に書き換わることがあるため、比較的安定な parent() に class を設定
                     tweet_url_info = parse_individual_tweet_url( $tweet_link.attr( 'href' ) );
+                
+                if ( ! stop_scrolling_request ) {
+                    $( w ).scrollTop( $tweet_link.offset().top - ( $( w ).height() / 2 ) ); // 1 ツイートずつスクロールさせる
+                }
                 
                 if ( ! tweet_url_info ) {
                     return;
@@ -1779,16 +1784,20 @@ var search_vicinity_tweet = ( () => {
             } );
             
             if ( $found_tweet.length <= 0 ) {
+                // TODO: 目的のツイートがあるにもかかわらず、通り過ぎることがあった
+                // →上のループ内で 1 ツイートずつスクロールさせることで改善されることを期待
                 // 見つからなかった場合、強制スクロール
-                if ( stop_scrolling_request ) {
-                    return $();
-                }
-                
-                //$( w ).scrollTop( $( d ).height() );
-                $( animate_target_selector ).animate( {
-                    //scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(), // →こちらだと無限ループする可能性あり
-                    scrollTop : $( d ).height(),
-                }, animate_speed );
+                /*
+                //if ( stop_scrolling_request ) {
+                //    return $();
+                //}
+                //
+                ////$( w ).scrollTop( $( d ).height() );
+                //$( animate_target_selector ).animate( {
+                //    //scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(), // →こちらだと無限ループする可能性あり
+                //    scrollTop : $( d ).height(),
+                //}, animate_speed );
+                */
                 
                 return $();
             }
@@ -1827,10 +1836,12 @@ var search_vicinity_tweet = ( () => {
                         return true;
                     }
                     
-                    //$( w ).scrollTop( to_scroll_top );
-                    $( animate_target_selector ).animate( {
-                        scrollTop : to_scroll_top,
-                    }, animate_speed );
+                    /*
+                    //$( animate_target_selector ).animate( {
+                    //    scrollTop : to_scroll_top,
+                    //}, animate_speed );
+                    */
+                    $( w ).scrollTop( to_scroll_top );
                     
                     return false;
                 }, // end of adjust_scroll()
@@ -1850,11 +1861,18 @@ var search_vicinity_tweet = ( () => {
                         
                         adjust_counter --;
                         
-                        if ( adjust_scroll( $found_tweet_container ) ) {
-                            adjust_passed_number ++;
+                        try {
+                            if ( adjust_scroll( $found_tweet_container ) ) {
+                                adjust_passed_number ++;
+                            }
+                            else {
+                                adjust_passed_number = 0;
+                            }
                         }
-                        else {
-                            adjust_passed_number = 0;
+                        catch ( error ) {
+                            log_error( 'adjust handler:', error, $found_tweet_container, $found_tweet_container.offset() );
+                            stop_adjust_handler();
+                            return;
                         }
                         
                         log_debug( 'adjust_passed_number:', adjust_passed_number );
@@ -2658,18 +2676,18 @@ function start_tweet_observer() {
             }
             performance.mark( 'm4' );
             
-            // タイムライン上で近傍ツイート検索
-            search_vicinity_tweet();
-            
-            performance.mark( 'm5' );
-            
             // タイムライン上のツイート確認
             check_timeline_tweets();
             
-            performance.mark( 'm6' );
+            performance.mark( 'm5' );
             
             // 通知タイムライン確認
             check_notification_timeline();
+            
+            performance.mark( 'm6' );
+            
+            // タイムライン上で近傍ツイート検索
+            search_vicinity_tweet();
             
             performance.mark( 'm7' );
         },
@@ -3312,9 +3330,9 @@ function initialize( user_options ) {
                 
                 { name : 'update_display_mode()', from : 'm1', to : 'm2' },
                 { name : 'check_error_page()', from : 'm2', to : 'm3' },
-                { name : 'search_vicinity_tweet()', from : 'm4', to : 'm5' },
-                { name : 'check_timeline_tweets()', from : 'm5', to : 'm6' },
-                { name : 'check_notification_timeline()', from : 'm6', to : 'm7' },
+                { name : 'check_timeline_tweets()', from : '45', to : 'm5' },
+                { name : 'check_notification_timeline()', from : 'm5', to : 'm6' },
+                { name : 'search_vicinity_tweet()', from : 'm6', to : 'm7' },
             ];
             
             entries.forEach( ( entry ) => {
