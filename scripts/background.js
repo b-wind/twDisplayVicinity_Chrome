@@ -16,7 +16,14 @@ function log_debug() {
     console.log.apply( console, arguments );
 } // end of log_debug()
 
+
+function log_error() {
+    console.error.apply( console, arguments );
+} // end of log_error()
+
+
 w.log_debug = log_debug;
+w.log_error = log_error;
 
 
 var reload_tabs = ( () => {
@@ -120,6 +127,27 @@ chrome.runtime.onMessage.addListener( function ( message, sender, sendResponse )
             }
             log_debug( '=> CONTENT_TAB_INFOS', CONTENT_TAB_INFOS );
             break;
+        
+        case 'FETCH_JSON' :
+            log_debug( 'FETCH_JSON', message );
+            
+            fetch( message.url, message.options )
+            .then( response => response.json() )
+            .then( ( json ) => {
+                log_debug( 'FETCH_JSON => json', json );
+                
+                sendResponse( {
+                    json : json,
+                } );
+            } )
+            .catch( ( error ) => {
+                log_error( 'FETCH_JSON => error', error );
+                
+                sendResponse( {
+                    error : error,
+                } );
+            } );
+            return true;
         
         default:
             break;

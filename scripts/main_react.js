@@ -277,7 +277,9 @@ var API_AUTHORIZATION_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6
         //  "Execution of script 'twDisplayVicinity' failed! Cannot set property name of #<Object> which has only a getter" ( by Tampermonkey )
         
         return search_parameters;
-    } )();
+    } )(),
+    
+    DOMAIN_PREFIX = location.hostname.match( /^(.+\.)?twitter\.com$/ )[ 1 ] || '';
 
 //}
 
@@ -814,10 +816,46 @@ function api_get_csrf_token() {
 } // end of api_get_csrf_token()
 
 
+function fetch_json( url, options ) {
+    log_debug( 'fetch_json()', url, options );
+    
+    if ( ( ! DOMAIN_PREFIX ) || ( IS_FIREFOX ) ) {
+        return fetch( url, options ).then( response => response.json() );
+    }
+    
+    /*
+    // mobile.twitter.com 等から api.twitter.com を呼ぶと、
+    // > Cross-Origin Read Blocking (CORB) blocked cross-origin response <url> with MIME type application/json. See https://www.chromestatus.com/feature/5629709824032768 for more details.
+    // のような警告が出て、レスポンスボディが空になってしまう
+    // 参考：
+    //   [Changes to Cross-Origin Requests in Chrome Extension Content Scripts - The Chromium Projects](https://www.chromium.org/Home/chromium-security/extension-content-script-fetches)
+    //   [Cross-Origin Read Blocking (CORB) とは - ASnoKaze blog](https://asnokaze.hatenablog.com/entry/2018/04/10/205717)
+    */
+    
+    return new Promise( ( resolve, reject ) => {
+        chrome.runtime.sendMessage( {
+            type : 'FETCH_JSON',
+            url : url,
+            options : options,
+        }, function ( response ) {
+            log_debug( 'FETCH_JSON => response', response );
+            
+            if ( response.error ) {
+                reject( response.error );
+                return;
+            }
+            resolve( response.json );
+            // TODO: シークレット(incognito)モードだと、{"errors":[{"code":353,"message":"This request requires a matching csrf cookie and header."}]} のように返されてしまう
+            // → manifest.json に『"incognito" : "split"』が必要だが、煩雑になる(Firefoxでは manifest.json 読み込み時にエラーとなる)ため、保留
+        } );
+    } );
+} // end of fetch_json()
+
+
 function fetch_user_timeline( user_id, max_id, count ) {
     var api_url = API_USER_TIMELINE_TEMPLATE.replace( /#USER_ID#/g, user_id ).replace( /#COUNT#/g, ( count ? count : 20 ) ) + ( ( max_id && /^\d+$/.test( max_id ) ) ? '&max_id=' + max_id : '' );
     
-    return fetch( api_url, {
+    return fetch_json( api_url, {
         method : 'GET',
         headers : {
             'authorization' : 'Bearer ' + API_AUTHORIZATION_BEARER,
@@ -830,6 +868,24 @@ function fetch_user_timeline( user_id, max_id, count ) {
         credentials: 'include',
     } );
 } // end of fetch_user_timeline()
+
+
+function fetch_retweets( tweet_id, max_user_count ) {
+    var api_url = API_STATUSES_RETWEETS_TEMPLATE.replace( /#TWEET_ID#/g, tweet_id ).replace( /#COUNT#/g, max_user_count );
+    
+    return fetch_json( api_url, {
+        method : 'GET',
+        headers : {
+            'authorization' : 'Bearer ' + API_AUTHORIZATION_BEARER,
+            'x-csrf-token' : api_get_csrf_token(),
+            'x-twitter-active-user' : 'yes',
+            'x-twitter-auth-type' : 'OAuth2Session',
+            'x-twitter-client-language' : LANGUAGE,
+        },
+        mode: 'cors',
+        credentials: 'include',
+    } );
+} // end of fetch_retweets()
 
 
 var open_child_window = ( () => {
@@ -872,9 +928,9 @@ var open_child_window = ( () => {
 
 
 var open_search_window = ( () => {
-    var user_timeline_url_template = 'https://twitter.com/#SCREEN_NAME#/with_replies?max_id=#MAX_ID#',
+    var user_timeline_url_template = 'https://' + DOMAIN_PREFIX + 'twitter.com/#SCREEN_NAME#/with_replies?max_id=#MAX_ID#',
         search_query_template = 'from:#SCREEN_NAME# until:#GMT_DATETIME# include:retweets include:nativeretweets',
-        search_url_template = 'https://twitter.com/search?f=live&q=#SEARCH_QUERY_ENCODED#';
+        search_url_template = 'https://' + DOMAIN_PREFIX + 'twitter.com/search?f=live&q=#SEARCH_QUERY_ENCODED#';
     
     return ( search_parameters ) => {
         search_parameters = Object.assign( {}, search_parameters );
@@ -904,7 +960,6 @@ var open_search_window = ( () => {
         }
         
         fetch_user_timeline( target_info.user_id, test_tweet_id )
-        .then( response => response.json() )
         .then( ( json ) => {
             log_debug( 'fetch_user_timeline() json:', json );
             
@@ -1327,7 +1382,8 @@ function check_timeline_tweets() {
         }
         
         var reacted_tweet_info = get_reacted_tweet_info( tweet_url_info.tweet_id ),
-            $users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
+            //$users = ( reacted_tweet_info ) ? $( 'div[aria-labelledby="modal-header"] section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
+            $users = ( reacted_tweet_info ) ? $( 'section[role="region"] div[data-testid="UserCell"]' ).filter( ':not(:has(.' + VICINITY_LINK_CONTAINER_CLASS + '))' ) : $(),
             background_color = getComputedStyle( d.body ).backgroundColor;
         
         log_debug( 'check_timeline_tweets():', $users.length, 'retweeters found', reacted_tweet_info );
@@ -1730,8 +1786,8 @@ var search_vicinity_tweet = ( () => {
                 
                 //$( w ).scrollTop( $( d ).height() );
                 $( animate_target_selector ).animate( {
-                    //scrollTop : $( d ).height(),
-                    scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(),
+                    //scrollTop : ( 0 < $tweet_links.length ) ? $tweet_links.last().offset().top : $( d ).height(), // →こちらだと無限ループする可能性あり
+                    scrollTop : $( d ).height(),
                 }, animate_speed );
                 
                 return $();
@@ -1910,7 +1966,7 @@ var search_vicinity_tweet = ( () => {
 
 
 function check_notification_timeline() {
-    if ( ! /^https?:\/\/twitter\.com\/i\/timeline/.test( location.href ) ) {
+    if ( ! /^https?:\/\/(?:mobile\.)?twitter\.com\/i\/timeline/.test( location.href ) ) {
         return;
     }
     
@@ -2405,21 +2461,7 @@ var [
             
             request_cache[ tweet_id ] = current_ms;
             
-            var api_url = API_STATUSES_RETWEETS_TEMPLATE.replace( /#TWEET_ID#/g, tweet_id ).replace( /#COUNT#/g, max_user_count );
-            
-            fetch( api_url, {
-                method : 'GET',
-                headers : {
-                    'authorization' : 'Bearer ' + API_AUTHORIZATION_BEARER,
-                    'x-csrf-token' : api_get_csrf_token(),
-                    'x-twitter-active-user' : 'yes',
-                    'x-twitter-auth-type' : 'OAuth2Session',
-                    'x-twitter-client-language' : LANGUAGE,
-                },
-                mode: 'cors',
-                credentials: 'include',
-            } )
-            .then( response => response.json() )
+            fetch_retweets( tweet_id, max_user_count )
             .then( ( json ) => {
                 log_debug( 'update_tweet_retweeters_info(): json=', json );
                 
@@ -2918,7 +2960,7 @@ function start_fetch_observer() {
                 filter_location_configs = [
                     {
                         name : 'usertimeline_for_searching',
-                        reg_location_url : /^https:\/\/twitter\.com\/([^\/]+)\/with_replies.*?[?&](?:max_id|max_position)=(\d*)/,
+                        reg_location_url : /^https:\/\/(?:mobile\.)?twitter\.com\/([^\/]+)\/with_replies.*?[?&](?:max_id|max_position)=(\d*)/,
                         filter_url_configs : [
                             {
                                 name : 'use_api1.1_instead_of_2',
